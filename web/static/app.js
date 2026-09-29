@@ -12,6 +12,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnNewPersona = document.getElementById("btn-new-persona");
   const langBtnZh = document.getElementById("lang-btn-zh");
   const langBtnEn = document.getElementById("lang-btn-en");
+  const btnToggleTutor = document.getElementById("btn-toggle-tutor");
+  const btnTutorText = document.getElementById("btn-tutor-text");
+  const tutorStatusDot = document.getElementById("tutor-status-dot");
+  const tutorActiveBadge = document.getElementById("tutor-active-badge");
+
+  // Tutor Persona Implant State
+  let isTutorMode = localStorage.getItem("deep_persona_tutor_mode") === "true";
 
   // DOM Elements - Chat Workspace
   const btnSend = document.getElementById("btn-send");
@@ -608,6 +615,12 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btnExportText) btnExportText.textContent = t.btnExport;
     if (btnNewPersonaText) btnNewPersonaText.textContent = t.btnNewPersona;
 
+    updateTutorUI();
+
+    document.querySelectorAll(".thought-toggle-label").forEach((lbl) => {
+      lbl.textContent = lang === "zh" ? "思考过程" : "Thought Process";
+    });
+
     // Update Mode Select options
     Array.from(modeSelect.options).forEach((opt) => {
       if (t.modes[opt.value]) {
@@ -764,6 +777,58 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ==========================================
+  // Tutor Persona Implant UI & Event Handlers
+  // ==========================================
+  function updateTutorUI() {
+    if (!btnToggleTutor) return;
+    btnToggleTutor.classList.toggle("active", isTutorMode);
+    if (tutorActiveBadge) {
+      tutorActiveBadge.classList.toggle("hidden", !isTutorMode);
+      tutorActiveBadge.textContent = currentLang === "zh" ? "🎓 口语导师已植入" : "🎓 Oral Tutor Active";
+    }
+    if (btnTutorText) {
+      btnTutorText.textContent = isTutorMode
+        ? (currentLang === "zh" ? "Tutor 导师模式 ON" : "Tutor Mode ON")
+        : (currentLang === "zh" ? "Tutor 导师植入" : "Tutor Implant");
+    }
+  }
+
+  if (btnToggleTutor) {
+    btnToggleTutor.addEventListener("click", async () => {
+      isTutorMode = !isTutorMode;
+      localStorage.setItem("deep_persona_tutor_mode", isTutorMode ? "true" : "false");
+      updateTutorUI();
+
+      try {
+        const res = await fetch("/api/chat/toggle-tutor", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ enabled: isTutorMode }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.current_state) {
+            lastState = data.current_state;
+            updateTelemetry(data.current_state, "tutor_mode_change");
+          }
+        }
+        showToast(
+          isTutorMode
+            ? (currentLang === "zh"
+                ? "🎓 已激活 Tutor 口语导师植入：信任度达最大值，角色将更积极主动引领对话！"
+                : "🎓 Tutor Mode Active: Trust set to maximum, character proactively drives dialogue!")
+            : (currentLang === "zh"
+                ? "已关闭 Tutor 导师植入，恢复纯粹角色扮演设定"
+                : "Tutor Mode Disabled, returned to standard persona roleplay"),
+          3000
+        );
+      } catch (e) {
+        console.error("Toggle tutor error:", e);
+      }
+    });
+  }
+
+  // ==========================================
   // 1. Fetch Personas & Initialize
   // ==========================================
   async function loadInitialData(selectPersonaId = null) {
@@ -772,12 +837,16 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await res.json();
       personasData = data.personas;
 
-      if (selectPersonaId) {
-        personaSelect.value = selectPersonaId;
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlPersona = urlParams.get("persona");
+      const targetId = selectPersonaId || urlPersona;
+
+      if (targetId) {
+        personaSelect.value = targetId;
       }
       renderPersonaOptions();
-      if (selectPersonaId) {
-        personaSelect.value = selectPersonaId;
+      if (targetId) {
+        personaSelect.value = targetId;
       }
       await resetSession();
       setLanguage(currentLang);
@@ -930,6 +999,7 @@ document.addEventListener("DOMContentLoaded", () => {
           mode: currentMode,
           model: "gemini-2.5-flash",
           seed: 42,
+          tutor_mode: isTutorMode,
         }),
       });
       if (!res.ok) {
@@ -1059,6 +1129,7 @@ document.addEventListener("DOMContentLoaded", () => {
           message,
           persona_id: currentPersonaId,
           mode: modeSelect.value,
+          tutor_mode: isTutorMode,
         }),
       });
 
@@ -1094,7 +1165,8 @@ document.addEventListener("DOMContentLoaded", () => {
         data.turn.assistant_embodied_action,
         assistantDisplayName,
         true, // animate typing
-        stateDelta
+        stateDelta,
+        data.turn.thought // collapsible thought process
       );
 
       // Update Telemetry with live metrics
@@ -1110,7 +1182,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function appendMessage(role, text, embodiedAction = null, name = null, animateTyping = false, stateDelta = null) {
+  function appendMessage(role, text, embodiedAction = null, name = null, animateTyping = false, stateDelta = null, thought = null) {
     const t = I18N[currentLang];
     const row = document.createElement("div");
     row.className = `message-row ${role}-row`;
@@ -1121,6 +1193,51 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const contentDiv = document.createElement("div");
     contentDiv.className = "message-content";
+
+    // Parse thought process if present or passed
+    let cleanSpokenText = text || "";
+    let thoughtContent = thought;
+
+    if (!thoughtContent && cleanSpokenText && role === "assistant") {
+      const thinkPattern = /<(?:think|thought|reasoning)>([\s\S]*?)<\/(?:think|thought|reasoning)>/i;
+      const match = cleanSpokenText.match(thinkPattern);
+      if (match) {
+        thoughtContent = match[1].trim();
+        cleanSpokenText = cleanSpokenText.replace(thinkPattern, "").trim();
+      } else {
+        const unclosedPattern = /<(?:think|thought|reasoning)>([\s\S]*)$/i;
+        const unclosedMatch = cleanSpokenText.match(unclosedPattern);
+        if (unclosedMatch) {
+          thoughtContent = unclosedMatch[1].trim();
+          cleanSpokenText = cleanSpokenText.replace(unclosedPattern, "").trim();
+        }
+      }
+    }
+
+    // Render collapsible thought container if thoughtContent exists
+    if (thoughtContent) {
+      const thoughtBox = document.createElement("div");
+      thoughtBox.className = "thought-container collapsed";
+      const tLabel = currentLang === "zh" ? "思考过程" : "Thought Process";
+      thoughtBox.innerHTML = `
+        <button type="button" class="thought-toggle-btn" title="${currentLang === "zh" ? "点击展开/折叠思考过程" : "Click to expand/collapse thought process"}">
+          <div class="thought-toggle-left">
+            <span class="thought-toggle-icon">💭</span>
+            <span class="thought-toggle-label">${tLabel}</span>
+          </div>
+          <span class="thought-chevron">▼</span>
+        </button>
+        <div class="thought-content-box">
+          <div class="thought-text"></div>
+        </div>
+      `;
+      thoughtBox.querySelector(".thought-text").textContent = thoughtContent;
+      const toggleBtn = thoughtBox.querySelector(".thought-toggle-btn");
+      toggleBtn.addEventListener("click", () => {
+        thoughtBox.classList.toggle("collapsed");
+      });
+      contentDiv.appendChild(thoughtBox);
+    }
 
     const bubble = document.createElement("div");
     bubble.className = "message-bubble";
@@ -1172,10 +1289,10 @@ document.addEventListener("DOMContentLoaded", () => {
     row.appendChild(contentDiv);
     messagesContainer.appendChild(row);
 
-    if (animateTyping && role === "assistant" && text) {
+    if (animateTyping && role === "assistant" && cleanSpokenText) {
       // Typewriter streaming effect
       let charIdx = 0;
-      const speedMs = Math.max(10, Math.min(22, Math.floor(1800 / Math.max(1, text.length))));
+      const speedMs = Math.max(10, Math.min(22, Math.floor(1800 / Math.max(1, cleanSpokenText.length))));
       const cursor = document.createElement("span");
       cursor.className = "typewriter-cursor";
       bubble.appendChild(cursor);
@@ -1186,7 +1303,7 @@ document.addEventListener("DOMContentLoaded", () => {
         isDone = true;
         clearInterval(typeTimer);
         cursor.remove();
-        bubble.textContent = text;
+        bubble.textContent = cleanSpokenText;
         if (chip) {
           chip.style.opacity = "1";
           chip.style.transform = "translateY(0)";
@@ -1195,8 +1312,8 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       const typeTimer = setInterval(() => {
-        if (charIdx < text.length) {
-          cursor.before(text.charAt(charIdx));
+        if (charIdx < cleanSpokenText.length) {
+          cursor.before(cleanSpokenText.charAt(charIdx));
           charIdx++;
           scrollToBottom();
         } else {
@@ -1207,7 +1324,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Click or tap anywhere on the message row to finish typing immediately
       row.addEventListener("click", finishTyping, { once: true });
     } else {
-      bubble.textContent = text;
+      bubble.textContent = cleanSpokenText;
       if (chip) {
         chip.style.opacity = "1";
         chip.style.transform = "translateY(0)";
@@ -1306,7 +1423,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (btnNewPersona) {
-    btnNewPersona.addEventListener("click", openNewPersonaModal);
+    btnNewPersona.addEventListener("click", (e) => {
+      // Navigate to dedicated persona creator studio
+      window.location.href = "/create";
+    });
   }
   if (modalBtnClose) {
     modalBtnClose.addEventListener("click", closeNewPersonaModal);
@@ -1723,6 +1843,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Start app
+  updateTutorUI();
   resetStoryExtractionState();
   loadInitialData();
 });

@@ -57,6 +57,13 @@
           <button class="lang-btn" id="lang-btn-en" data-lang="en">EN</button>
         </div>
 
+        <!-- Tutor Persona Implant Toggle Button -->
+        <button id="btn-toggle-tutor" class="btn btn-tutor" title="开启/关闭 Tutor 口语导师植入模式 (积极引导对话与口语对练)">
+          <span class="tutor-icon">🎓</span>
+          <span id="btn-tutor-text">Tutor 导师植入</span>
+          <span class="tutor-status-dot" id="tutor-status-dot"></span>
+        </button>
+
         <button id="btn-reset" class="btn btn-secondary" title="Reset current session">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
           <span id="btn-reset-text">重置</span>
@@ -65,10 +72,10 @@
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span id="btn-export-text">导出</span>
         </button>
-        <button id="btn-new-persona" class="btn btn-primary" title="Create New Persona">
+        <a href="/create" id="btn-new-persona" class="btn btn-primary" title="Create New Persona">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          <span id="btn-new-persona-text">新建人格</span>
-        </button>
+          <span id="btn-new-persona-text">新建人格工坊</span>
+        </a>
       </div>
     </header>
 
@@ -82,6 +89,7 @@
             <span class="role-chip" id="user-role-badge">You: Parent</span>
             <span class="vs-text" id="vs-text">interacts with</span>
             <span class="role-chip persona-chip" id="persona-role-badge">Evelyn: Daughter</span>
+            <span class="role-chip tutor-chip hidden" id="tutor-active-badge">🎓 口语导师植入中</span>
           </div>
           <div class="scenario-context" id="scenario-context-text">
             Your mother has discovered that you have been vaping at school. The conversation begins immediately after she confronts you.

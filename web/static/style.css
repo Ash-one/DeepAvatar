@@ -317,6 +317,55 @@ body {
   border-color: rgba(16, 185, 129, 0.3);
 }
 
+.tutor-chip {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fef08a;
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Tutor Persona Implant Toggle Button */
+.btn-tutor {
+  background: rgba(245, 158, 11, 0.08);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.btn-tutor:hover {
+  background: rgba(245, 158, 11, 0.16);
+  border-color: rgba(245, 158, 11, 0.45);
+  color: #fffbeb;
+  transform: translateY(-1px);
+}
+
+.btn-tutor.active {
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.35), rgba(245, 158, 11, 0.25));
+  color: #fffbeb;
+  border-color: rgba(245, 158, 11, 0.6);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+}
+
+.tutor-icon {
+  font-size: 0.95rem;
+}
+
+.tutor-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #64748b;
+  transition: all 0.25s ease;
+}
+
+.btn-tutor.active .tutor-status-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+}
+
 .vs-text {
   font-size: 0.72rem;
   color: var(--text-muted);
@@ -458,6 +507,91 @@ body {
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   border-bottom-left-radius: 4px;
+}
+
+/* Collapsible Thought Process Box */
+.thought-container {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-md);
+  background: rgba(99, 102, 241, 0.06);
+  border: 1px solid rgba(99, 102, 241, 0.22);
+  margin-bottom: 4px;
+  overflow: hidden;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 100%;
+}
+
+.thought-container:hover {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.38);
+}
+
+.thought-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  color: #a5b4fc;
+  font-family: var(--font-main);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  user-select: none;
+  gap: 8px;
+}
+
+.thought-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thought-toggle-icon {
+  font-size: 0.88rem;
+  line-height: 1;
+}
+
+.thought-toggle-label {
+  letter-spacing: 0.01em;
+}
+
+.thought-chevron {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+  line-height: 1;
+}
+
+.thought-container.collapsed .thought-chevron {
+  transform: rotate(-90deg);
+}
+
+.thought-container:not(.collapsed) .thought-chevron {
+  transform: rotate(0deg);
+}
+
+.thought-content-box {
+  border-top: 1px solid rgba(99, 102, 241, 0.15);
+  padding: 10px 14px;
+  background: rgba(10, 12, 16, 0.45);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: #cbd5e1;
+  max-height: 380px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: var(--font-main);
+  border-left: 3px solid var(--accent-primary);
+}
+
+.thought-container.collapsed .thought-content-box {
+  display: none;
 }
 
 /* Embodied Action Chip */
