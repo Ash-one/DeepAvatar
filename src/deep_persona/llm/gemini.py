@@ -80,14 +80,21 @@ class GeminiLLM(BaseLLM):
             raise ValueError(f"No completion choices returned by model: {data}")
 
         choice = choices[0]
-        content = choice.get("message", {}).get("content", "")
+        msg = choice.get("message", {})
+        content = msg.get("content", "")
+        reasoning_content = (
+            msg.get("reasoning_content")
+            or msg.get("reasoning")
+            or choice.get("reasoning_content")
+        )
         usage = data.get("usage", {})
 
         return LLMResponse(
-            content=content.strip(),
+            content=content.strip() if content else "",
             usage=usage,
             model=data.get("model", self.model),
             raw_response=data,
+            reasoning_content=reasoning_content.strip() if reasoning_content else None,
         )
 
 

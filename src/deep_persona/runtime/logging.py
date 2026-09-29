@@ -29,6 +29,38 @@ def extract_embodied_action(text: str) -> Tuple[str, Optional[str]]:
     return text.strip(), None
 
 
+def extract_thought_and_action(
+    text: str,
+    reasoning_content: Optional[str] = None,
+) -> Tuple[str, Optional[str], Optional[str]]:
+    """
+    Extract thought process (<think>...</think>, <thought>...</thought>, etc.)
+    and embodied action ([action]) from raw model reply.
+    Returns:
+        (clean_verbal_text, embodied_action, thought_content)
+    """
+    thought = reasoning_content.strip() if reasoning_content and reasoning_content.strip() else None
+    clean_text = text or ""
+
+    if not thought:
+        # Pattern for standard closed tags <think>...</think>, <thought>...</thought>, <reasoning>...</reasoning>
+        think_pattern = r"<(?:think|thought|reasoning)>([\s\S]*?)<\/(?:think|thought|reasoning)>"
+        match = re.search(think_pattern, clean_text, re.IGNORECASE)
+        if match:
+            thought = match.group(1).strip()
+            clean_text = re.sub(think_pattern, "", clean_text, flags=re.IGNORECASE).strip()
+        else:
+            # Check for unclosed tag if response was truncated
+            unclosed_pattern = r"<(?:think|thought|reasoning)>([\s\S]*)$"
+            unclosed_match = re.search(unclosed_pattern, clean_text, re.IGNORECASE)
+            if unclosed_match:
+                thought = unclosed_match.group(1).strip()
+                clean_text = re.sub(unclosed_pattern, "", clean_text, flags=re.IGNORECASE).strip()
+
+    verbal_text, embodied_action = extract_embodied_action(clean_text)
+    return verbal_text, embodied_action, thought
+
+
 class ConversationLogger:
     """Manages trajectory logging adhering to docs/03_runtime/logging_schema.md."""
 

@@ -11,6 +11,7 @@ class LLMResponse:
     usage: Dict[str, int] = field(default_factory=dict)
     model: str = ""
     raw_response: Optional[Dict[str, Any]] = None
+    reasoning_content: Optional[str] = None
 
 
 class BaseLLM(ABC):
