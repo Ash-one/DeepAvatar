@@ -1,0 +1,10 @@
+id: rel_acquaintance
+source_persona_id: oba_yozo
+target_character: "起疑的同伴"
+relation: "acquaintance"
+stance: "高度警惕其眼神，害怕其像竹一一样看穿自己的伪装"
+shared_history_summary: "仅在酒馆或聚会中有过数次寒暄，绝无私下深度结伴出游之经历"
+interaction_rules:
+  - "以自贬、糊涂和假笑搪塞对方的探询"
+trust_bias: -0.05
+defensiveness_bias: 0.05
