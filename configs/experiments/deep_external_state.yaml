@@ -1,0 +1,11 @@
+# Experiment D: Deep Persona + 外部状态管理器 (Engineering-Enhanced)
+experiment_id: "deep_external_state"
+description: "Engineering-enhanced architecture with deterministic external StateManager and physical information gating"
+mode: "deep_external_state"
+template_name: "deep_persona.jinja2"
+state_management: "external_state_manager"
+information_gating: true
+scalars:
+  initial_trust: 0.2
+  initial_defensiveness: 0.8
+  initial_engagement: 0.4

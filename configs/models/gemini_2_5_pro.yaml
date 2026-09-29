@@ -1,0 +1,8 @@
+# Model configuration for Gemini 2.5 Pro / Flash
+model_id: "gemini-2.5-pro"
+provider: "google"
+endpoint: "http://127.0.0.1:8045/v1"
+decoding_params:
+  temperature: 0.7
+  top_p: 0.95
+  max_output_tokens: 1024

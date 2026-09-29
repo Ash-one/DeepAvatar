@@ -1,0 +1,7 @@
+# Experiment C: Deep Persona + Prompt 内部状态
+experiment_id: "deep_prompt_state"
+description: "Faithful three-layer architecture with state section managed implicitly by LLM context"
+mode: "deep_prompt_state"
+template_name: "deep_persona.jinja2"
+state_management: "prompt_implicit"
+information_gating: false

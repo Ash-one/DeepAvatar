@@ -1,0 +1,29 @@
+# Global evaluation pipeline hyperparameters and thresholds
+pragmatics:
+  window_size: 5
+  tau_echo: 0.65
+  weights:
+    alpha: 0.33   # User overlap penalty weight
+    beta: 0.33    # Self-repetition penalty weight
+    gamma: 0.33   # Echolalia rate penalty weight
+
+emotion:
+  alpha: 0.70     # Weight for emotion lexical diversity vs intensity diversity
+  use_nrc_lexicon: true
+
+dns:
+  lambda_decay: 0.089
+  dimensions: 3
+  degrees_of_freedom: 3
+  significance_level: 0.05
+  baselines:
+    - dailydialog
+    - counselchat
+    - combined
+
+user_simulator:
+  temperature: 0.5
+  top_p: 0.9
+  recommended_turns_min: 15
+  recommended_turns_max: 25
+  seeds_count: 30

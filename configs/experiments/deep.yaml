@@ -1,0 +1,7 @@
+# Experiment B: Deep Persona (Static 3-Layer)
+experiment_id: "deep"
+description: "Faithful three-layer architecture (External, Middle, Internal) without dynamic state tracker"
+mode: "deep"
+template_name: "deep_persona.jinja2"
+state_management: "none"
+information_gating: false

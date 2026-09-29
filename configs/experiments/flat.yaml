@@ -1,0 +1,7 @@
+# Experiment A: Flat Baseline
+experiment_id: "flat"
+description: "Flat Baseline without hierarchical layer syntax or explicit state dynamic"
+mode: "flat"
+template_name: "flat_persona.jinja2"
+state_management: "none"
+information_gating: false

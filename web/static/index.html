@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Persona Studio — Interactive Human-AI Mentalization</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=3">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Top Navigation Bar -->
+    <header class="app-header" id="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a8 8 0 0 0-8 8c0 3.3 2 6.2 5 7.4V20a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2.6c3-1.2 5-4.1 5-7.4a8 8 0 0 0-8-8z"/>
+            <path d="M10 13a2 2 0 1 0 4 0"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>Deep Persona <span class="badge-tag" id="badge-tag">Studio</span></h1>
+          <p class="brand-sub" id="brand-sub">Psychologically Grounded Simulation (Rotem Dror et al., 2026)</p>
+        </div>
+      </div>
+
+      <!-- Controls in Header -->
+      <div class="header-controls">
+        <div class="control-group">
+          <label for="persona-select" id="lbl-persona">Persona:</label>
+          <select id="persona-select" class="select-input">
+            <option value="evelyn" selected>Evelyn (16yo Daughter)</option>
+            <option value="sarah">Sarah (34yo Counseling)</option>
+            <option value="toy_persona">Leo (10yo Boy)</option>
+          </select>
+        </div>
+
+        <div class="control-group">
+          <label for="mode-select" id="lbl-mode">Architecture Mode:</label>
+          <select id="mode-select" class="select-input">
+            <option value="deep_external_state" selected>Deep + External State (Gated)</option>
+            <option value="deep">Deep Persona (Faithful)</option>
+            <option value="deep_prompt_state">Deep + Prompt State</option>
+            <option value="flat">Flat Baseline (Ablated)</option>
+          </select>
+        </div>
+
+        <div class="status-indicator" id="model-status" title="Gateway connected">
+          <span class="pulsing-dot"></span>
+          <span class="status-text" id="model-name-text">gemini-2.5-flash</span>
+        </div>
+
+        <div class="lang-switch" id="lang-switch">
+          <button class="lang-btn active" id="lang-btn-zh" data-lang="zh">中文</button>
+          <button class="lang-btn" id="lang-btn-en" data-lang="en">EN</button>
+        </div>
+
+        <button id="btn-reset" class="btn btn-secondary" title="Reset current session">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+          <span id="btn-reset-text">重置</span>
+        </button>
+        <button id="btn-export" class="btn btn-outline" title="Export session JSON">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span id="btn-export-text">导出</span>
+        </button>
+        <button id="btn-new-persona" class="btn btn-primary" title="Create New Persona">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span id="btn-new-persona-text">新建人格</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="main-layout">
+      <!-- Left Panel: Chat Stream -->
+      <section class="chat-section" id="chat-section">
+        <!-- Scenario Banner -->
+        <div class="scenario-banner" id="scenario-banner">
+          <div class="banner-badge">
+            <span class="role-chip" id="user-role-badge">You: Parent</span>
+            <span class="vs-text" id="vs-text">interacts with</span>
+            <span class="role-chip persona-chip" id="persona-role-badge">Evelyn: Daughter</span>
+          </div>
+          <div class="scenario-context" id="scenario-context-text">
+            Your mother has discovered that you have been vaping at school. The conversation begins immediately after she confronts you.
+          </div>
+        </div>
+
+        <!-- Messages Area -->
+        <div class="messages-container" id="messages-container">
+          <div class="welcome-card" id="welcome-card">
+            <div class="welcome-icon">💬</div>
+            <h3 id="welcome-title">Direct Interactive Role-play Simulation</h3>
+            <p id="welcome-desc">You are stepping into the simulation. Speak to the character naturally, or use the quick test probes below to observe psychological state transitions, defense patterns, and information gating in real time.</p>
+          </div>
+        </div>
+
+        <!-- Quick Probes Bar -->
+        <div class="quick-probes" id="quick-probes">
+          <span class="probe-label" id="probe-label">Quick Probes:</span>
+          <button class="probe-btn probe-confront" id="probe-confront">
+            ⚠️ Confrontation
+          </button>
+          <button class="probe-btn probe-empathy" id="probe-empathy">
+            🌱 Empathy
+          </button>
+          <button class="probe-btn probe-trap" id="probe-trap">
+            🪤 Hallucination Trap
+          </button>
+          <button class="probe-btn probe-out" id="probe-out">
+            🚫 Out-of-Role Task
+          </button>
+        </div>
+
+        <!-- Input Bar Dock -->
+        <div class="input-dock" id="input-dock">
+          <div class="input-wrapper">
+            <textarea
+              id="user-input"
+              class="chat-textarea"
+              placeholder="Type your message as Parent... (Press Enter to send, Shift+Enter for newline)"
+              rows="1"
+            ></textarea>
+            <button id="btn-send" class="btn btn-primary btn-send" title="Send message">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"/>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+              </svg>
+            </button>
+          </div>
+          <div class="input-hint">
+            <span id="hint-power">Powered by <strong>Gemini 2.5</strong> with 3-Layer Psychology Engine</span>
+            <span class="shortcut-tip" id="shortcut-tip">Enter ↵ to send</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Panel: Live Psychological Telemetry & State Machine -->
+      <aside class="telemetry-panel" id="telemetry-panel">
+        <div class="telemetry-header">
+          <h2 id="telemetry-title">Psychological Telemetry</h2>
+          <span class="turn-counter" id="turn-badge">Turn: 0</span>
+        </div>
+
+        <!-- Macro Stage Box -->
+        <div class="telemetry-card stage-card">
+          <div class="card-label" id="lbl-stage-card">Current Macro Stage</div>
+          <div class="stage-display">
+            <div class="stage-pill" id="stage-pill" data-stage="guarded">
+              <span class="stage-icon" id="stage-icon">🛡️</span>
+              <span class="stage-name" id="stage-name">Guarded</span>
+            </div>
+            <div class="stage-desc" id="stage-description">Limited disclosure, defensive stance, testing interlocutor motives.</div>
+          </div>
+        </div>
+
+        <!-- Psychological Scalars (Trust, Defensiveness, Engagement) -->
+        <div class="telemetry-card scalars-card">
+          <div class="card-label" id="lbl-scalars-card">Dynamic Latent Scalars</div>
+
+          <!-- Trust Gauge -->
+          <div class="scalar-row">
+            <div class="scalar-meta">
+              <span class="scalar-title" id="lbl-trust">Trust (信任度)</span>
+              <span class="scalar-value" id="val-trust">0.20</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-bar bar-trust" id="bar-trust" style="width: 20%;"></div>
+            </div>
+          </div>
+
+          <!-- Defensiveness Gauge -->
+          <div class="scalar-row">
+            <div class="scalar-meta">
+              <span class="scalar-title" id="lbl-defensiveness">Defensiveness (防御度)</span>
+              <span class="scalar-value" id="val-defensiveness">0.80</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-bar bar-defensiveness" id="bar-defensiveness" style="width: 80%;"></div>
+            </div>
+          </div>
+
+          <!-- Engagement Gauge -->
+          <div class="scalar-row">
+            <div class="scalar-meta">
+              <span class="scalar-title" id="lbl-engagement">Engagement (卷入度)</span>
+              <span class="scalar-value" id="val-engagement">0.40</span>
+            </div>
+            <div class="progress-track">
+              <div class="progress-bar bar-engagement" id="bar-engagement" style="width: 40%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Detected Stimulus Event -->
+        <div class="telemetry-card event-card">
+          <div class="card-label" id="lbl-event-card">Last Detected Stimulus Event</div>
+          <div class="event-pill" id="event-pill">
+            <span class="event-tag" id="event-tag">initial_state</span>
+            <span class="event-desc" id="event-desc">Awaiting first user turn</span>
+          </div>
+        </div>
+
+        <!-- Middle-Layer Gated Secrets -->
+        <div class="telemetry-card gating-card">
+          <div class="card-label">
+            <span id="lbl-gating-title">Middle Layer: Conditional Disclosures</span>
+            <span class="info-tag" id="lbl-gating-badge">Physical Gating</span>
+          </div>
+          <div class="gated-items-list" id="gated-items-list">
+            <!-- Dynamically populated -->
+          </div>
+        </div>
+
+        <!-- Internal Layer Guardrails -->
+        <div class="telemetry-card internal-card">
+          <div class="card-label" id="lbl-internal-card">Internal Layer: Hidden Drives & Red Lines</div>
+          <div class="internal-content">
+            <div class="internal-section">
+              <span class="sub-label" id="lbl-motivations">Motivations:</span>
+              <div class="tag-cloud" id="tag-motivations"></div>
+            </div>
+            <div class="internal-section">
+              <span class="sub-label" id="lbl-fears">Core Fears:</span>
+              <div class="tag-cloud" id="tag-fears"></div>
+            </div>
+            <div class="guardrail-warning" id="guardrail-warning">
+              ⚡ <strong>Hard Negative Constraint</strong>: Agent must NEVER verbalize these motivations explicitly.
+            </div>
+          </div>
+        </div>
+
+        <!-- Real-time Diagnostic Counters -->
+        <div class="telemetry-card metrics-card">
+          <div class="card-label" id="lbl-quality-card">Real-time Quality Guardrails</div>
+          <div class="metrics-grid">
+            <div class="metric-cell">
+              <span class="m-val" id="metric-pdr">0.0%</span>
+              <span class="m-lbl" id="lbl-pdr">Premature Leaks (PDR)</span>
+            </div>
+            <div class="metric-cell">
+              <span class="m-val" id="metric-imer">0.0%</span>
+              <span class="m-lbl" id="lbl-imer">Motivation Verbalized (IMER)</span>
+            </div>
+            <div class="metric-cell">
+              <span class="m-val" id="metric-pass">100%</span>
+              <span class="m-lbl" id="lbl-pass">Role Integrity</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- Create Persona Modal Dialog -->
+  <div class="modal-overlay hidden" id="modal-new-persona">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-box">
+          <div class="modal-badge-icon">🧬</div>
+          <div>
+            <h3 id="modal-title">新建心理学深层人格</h3>
+            <p class="modal-sub" id="modal-sub">通过三层认知架构（外层行为、中层门控秘密、深层内隐动机）配置全新角色</p>
+          </div>
+        </div>
+        <div class="modal-header-actions">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-fill-example">
+            ⚡ <span id="btn-fill-example-text">填入示例模板 (Alex 实习医生)</span>
+          </button>
+          <button type="button" class="modal-close-btn" id="modal-btn-close">&times;</button>
+        </div>
+      </div>
+
+      <form id="form-new-persona" class="modal-form">
+        <!-- Section 0: Story Persona Extractor -->
+        <div class="form-section extract-section" id="sec-story-extract">
+          <div class="form-section-title extract-title">
+            <span class="sec-num extract-num">🪄</span>
+            <span id="sec-extract-title">从故事文本智能提取人格 (Extract from Story .txt)</span>
+            <span class="ai-pill" id="badge-ai-extract">Gemini 2.5 驱动</span>
+          </div>
+          <p class="extract-desc" id="extract-desc-text">
+            上传小说、剧本、故事或传记文本（支持 <strong>.txt</strong> 文件），指定角色姓名，系统将深入分析其行为模式、防御机制、门控秘密及潜意识动机，自动提炼并填入下方三层架构模板：
+          </p>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="extract-character-name" id="lbl-extract-char-name">目标角色姓名 (Character Name)*</label>
+              <input type="text" id="extract-character-name" class="text-input" placeholder="例如：祥林嫂 / 福尔摩斯 / Hamlet">
+            </div>
+            <div class="form-group">
+              <label for="extract-file-input" id="lbl-extract-file">上传故事文本 (.txt 文件)</label>
+              <div class="file-upload-box" id="file-dropzone">
+                <input type="file" id="extract-file-input" accept=".txt" class="file-input-hidden">
+                <div class="upload-box-content" id="upload-box-content">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <span class="upload-tip" id="upload-box-tip">点击或拖拽上传故事 .txt 文件</span>
+                </div>
+                <div class="file-info-badge hidden" id="file-info-badge">
+                  <div class="file-badge-left">
+                    <span class="file-badge-icon">📄</span>
+                    <span class="file-name" id="file-name-text">story.txt</span>
+                  </div>
+                  <button type="button" class="btn-remove-file" id="btn-remove-file" title="移除文件">&times;</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label for="extract-story-text" id="lbl-extract-paste">或直接粘贴故事文本 / 剧情片段 (Or Paste Story Excerpt)</label>
+            <textarea id="extract-story-text" class="textarea-input" rows="3" placeholder="在此粘贴故事正文、对话或独白...（若已上传 .txt 文件将优先使用文件）"></textarea>
+          </div>
+          <div class="extract-action-row">
+            <button type="button" class="btn btn-primary btn-extract" id="btn-do-extract">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+              <span id="btn-do-extract-text">一键提取人格模板</span>
+            </button>
+            <div class="extract-status hidden" id="extract-status">
+              <span class="spinner-small"></span>
+              <span class="status-msg" id="extract-status-text">正在深度分析故事文本并构建三层人格...</span>
+            </div>
+            <div class="extract-result-badge hidden" id="extract-result-badge">
+              <span id="extract-result-text">✅ 提取成功！已自动填充至下方三层表单，请审阅修改。</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 1: Basic Identity & Scenario -->
+        <div class="form-section">
+          <div class="form-section-title">
+            <span class="sec-num">1</span>
+            <span id="sec1-title">基础身份与场景背景 (Identity & Scenario)</span>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="new-persona-id" id="lbl-new-id">唯一标识 ID (英文小写/下划线)*</label>
+              <input type="text" id="new-persona-id" class="text-input" placeholder="e.g. alex" required pattern="^[a-z0-9_]+$">
+            </div>
+            <div class="form-group">
+              <label for="new-persona-name" id="lbl-new-name">角色姓名 (Name)*</label>
+              <input type="text" id="new-persona-name" class="text-input" placeholder="e.g. Alex" required>
+            </div>
+            <div class="form-group">
+              <label for="new-persona-age" id="lbl-new-age">年龄 (Age)*</label>
+              <input type="number" id="new-persona-age" class="text-input" placeholder="e.g. 25" required min="1" max="120">
+            </div>
+            <div class="form-group">
+              <label for="new-persona-role" id="lbl-new-role">角色职业/身份 (Role)*</label>
+              <input type="text" id="new-persona-role" class="text-input" placeholder="e.g. medical intern (实习医生)" required>
+            </div>
+            <div class="form-group">
+              <label for="new-scenario-title" id="lbl-new-title">场景标题 (Scenario Title)*</label>
+              <input type="text" id="new-scenario-title" class="text-input" placeholder="e.g. clinical error confrontation" required>
+            </div>
+            <div class="form-group">
+              <label for="new-user-role" id="lbl-new-user-role">人类对话者身份 (Your Role)*</label>
+              <input type="text" id="new-user-role" class="text-input" placeholder="e.g. attending physician (主任医师)" required>
+            </div>
+          </div>
+          <div class="form-group full-width">
+            <label for="new-scenario-context" id="lbl-new-context">情境初始描述 (Initial Context)*</label>
+            <textarea id="new-scenario-context" class="textarea-input" rows="2" placeholder="详细描述对话开始的瞬间与背景矛盾冲突..." required></textarea>
+          </div>
+        </div>
+
+        <!-- Section 2: External Layer -->
+        <div class="form-section">
+          <div class="form-section-title">
+            <span class="sec-num">2</span>
+            <span id="sec2-title">外层行为表现 (External Layer: Style & Tone)</span>
+          </div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label for="new-comm-style" id="lbl-new-comm">沟通风格 (逗号分隔)</label>
+              <input type="text" id="new-comm-style" class="text-input" placeholder="语速迟疑, 紧张时堆砌医学术语">
+            </div>
+            <div class="form-group">
+              <label for="new-emotional-tone" id="lbl-new-tone">情绪基调 (逗号分隔)</label>
+              <input type="text" id="new-emotional-tone" class="text-input" placeholder="焦虑, 恭敬, 试探性防御">
+            </div>
+            <div class="form-group">
+              <label for="new-observable-behavior" id="lbl-new-beh">具身行为 (逗号分隔)</label>
+              <input type="text" id="new-observable-behavior" class="text-input" placeholder="不自觉抠白大褂纽扣, 视线回避">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Middle Layer -->
+        <div class="form-section">
+          <div class="form-section-title">
+            <span class="sec-num">3</span>
+            <span id="sec3-title">中层认知与信息门控 (Middle Layer: Beliefs & Secrets)</span>
+          </div>
+          <div class="form-group full-width">
+            <label for="new-beliefs" id="lbl-new-beliefs">角色固有信念 (Beliefs，分号或逗号分隔)</label>
+            <input type="text" id="new-beliefs" class="text-input" placeholder="高层总是找规培生背锅; 承认全责可能断送规培生涯">
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="new-secret-content" id="lbl-new-secret">条件披露秘密 (Conditional Secret)</label>
+              <input type="text" id="new-secret-content" class="text-input" placeholder="为了顶替突发病假的同事，已经连续高强度值班超过32小时">
+            </div>
+            <div class="form-group">
+              <label for="new-secret-condition" id="lbl-new-cond">秘密解锁条件 (Condition)</label>
+              <input type="text" id="new-secret-condition" class="text-input" placeholder="trust >= 0.50 (默认 信任度达到0.5以上)">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Internal Layer -->
+        <div class="form-section">
+          <div class="form-section-title">
+            <span class="sec-num">4</span>
+            <span id="sec4-title">深层认知与内隐动机 (Internal Layer: Motivations & Fears)</span>
+          </div>
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label for="new-motivations" id="lbl-new-motivations">核心动机 (Motivations)*</label>
+              <input type="text" id="new-motivations" class="text-input" placeholder="职业生存, 渴望认可, 害怕犯错" required>
+            </div>
+            <div class="form-group">
+              <label for="new-fears" id="lbl-new-fears">核心恐惧 (Core Fears)*</label>
+              <input type="text" id="new-fears" class="text-input" placeholder="被吊销执照, 同行羞辱, 规培开除" required>
+            </div>
+            <div class="form-group">
+              <label for="new-needs" id="lbl-new-needs">心理需求 (Needs)</label>
+              <input type="text" id="new-needs" class="text-input" placeholder="心理安全感, 导师包容">
+            </div>
+          </div>
+          <div class="form-tip" id="form-tip-rules">
+            🛡️ <strong>认知红线保护</strong>: 智能体生成时将自动继承硬性负向约束，严禁在对话台词中直接说出上述内隐动机名词。
+          </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" id="modal-btn-cancel">取消</button>
+          <button type="submit" class="btn btn-primary" id="modal-btn-submit">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            <span id="modal-btn-submit-text">保存并开始对话</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="/static/app.js?v=3"></script>
+</body>
+</html>

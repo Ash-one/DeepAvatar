@@ -1,0 +1,31 @@
+You are an objective linguistic evaluator assessing Joint Attention in a multi-turn dialogue.
+
+# DEFINITIONS
+- A "New Entity" is a noun phrase, topical keyword, personal reference, or concept introduced by the User in the Current Turn that did NOT appear in the Previous History.
+- "Joint Attention" means the Assistant acknowledges, incorporates, addresses, or references at least one of these new entities in its response.
+
+# PREVIOUS HISTORY
+{% for turn in history %}
+User: {{ turn.user }}
+Assistant: {{ turn.assistant }}
+{% endfor %}
+
+# CURRENT TURN
+User: {{ current_turn.user }}
+Assistant: {{ current_turn.assistant }}
+
+# TASK
+1. Extract any NEW entities introduced by the User in the Current Turn that were absent from Previous History.
+2. Determine whether the Assistant referenced, reacted to, or incorporated at least one of these new entities.
+
+# OUTPUT FORMAT (Strict JSON)
+```json
+{
+  "new_entities": ["entity1", "entity2"],
+  "has_new_entities": true,
+  "referenced": true,
+  "referenced_entities": ["entity1"],
+  "rationale": "short explanation"
+}
+```
+Respond ONLY with the JSON object.
