@@ -35,6 +35,8 @@ class PromptRenderer:
         persona: PersonaConfig,
         mode: str = "deep_external_state",
         state: Optional[PersonaState] = None,
+        memory_context: Optional[Dict[str, Any]] = None,
+        voice_exemplars: Optional[List[Any]] = None,
     ) -> str:
         """
         Render system prompt for persona based on mode.
@@ -42,7 +44,7 @@ class PromptRenderer:
         - flat: Flat baseline prompt without layer syntax
         - deep: Faithful three-layer prompt
         - deep_prompt_state: Faithful three-layer with state section
-        - deep_external_state: Three-layer with physical information gating
+        - deep_external_state: Three-layer with physical information gating and memory boundaries
         """
         if mode == "flat":
             template = self.env.get_template("flat_persona.jinja2")
@@ -77,6 +79,8 @@ class PromptRenderer:
             state=state if mode in ("deep_prompt_state", "deep_external_state") else None,
             mode=mode,
             active_conditional_info=active_info,
+            memory_context=memory_context,
+            voice_exemplars=voice_exemplars,
         )
 
     def render_user_simulator(
