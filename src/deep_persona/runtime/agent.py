@@ -2,8 +2,10 @@
 
 from typing import Dict, List, Optional, Tuple
 from deep_persona.llm.base import BaseLLM
+from deep_persona.memory.store import MemoryStore
 from deep_persona.persona.renderer import PromptRenderer
 from deep_persona.persona.schema import PersonaConfig
+from deep_persona.persona.voice_retriever import VoiceExemplarRetriever
 from deep_persona.runtime.state import PersonaState
 from deep_persona.runtime.transitions import StateManager, classify_event_rule_based
 
@@ -18,6 +20,8 @@ class PersonaAgent:
         llm: Optional[BaseLLM] = None,
         renderer: Optional[PromptRenderer] = None,
         initial_state: Optional[PersonaState] = None,
+        memory_store: Optional[MemoryStore] = None,
+        voice_retriever: Optional[VoiceExemplarRetriever] = None,
         temperature: float = 0.7,
         top_p: float = 0.95,
         max_tokens: int = 1024,
@@ -26,6 +30,8 @@ class PersonaAgent:
         self.mode = mode
         self.llm = llm
         self.renderer = renderer or PromptRenderer()
+        self.memory_store = memory_store or MemoryStore(persona=persona)
+        self.voice_retriever = voice_retriever or VoiceExemplarRetriever(persona=persona)
         self.temperature = temperature
         self.top_p = top_p
         self.max_tokens = max_tokens
@@ -33,7 +39,7 @@ class PersonaAgent:
         # External state manager for external state mode
         self.state_manager = StateManager(persona, initial_state=initial_state)
         # For prompt state or deep/flat, keep a baseline state tracker
-        self.current_state = initial_state or PersonaState(stage=persona.dynamics.initial_stage)
+        self.current_state = initial_state or PersonaState.create_for_persona(persona)
         self.history: List[Dict[str, str]] = []
 
     def respond(self, user_message: str) -> Tuple[str, PersonaState, PersonaState, str]:
@@ -62,11 +68,29 @@ class PersonaAgent:
 
         state_after = PersonaState.from_dict(self.current_state.to_dict())
 
+        # Retrieve perspective-bounded memory context and context-aware voice exemplars if applicable
+        memory_context = None
+        voice_exemplars = None
+        if self.mode != "flat":
+            current_user_role = self.persona.scenario.user_role if self.persona.scenario else None
+            memory_context = self.memory_store.retrieve(
+                query=user_message,
+                current_interlocutor=current_user_role,
+            )
+            voice_exemplars = self.voice_retriever.retrieve(
+                query=user_message,
+                state=self.current_state,
+                current_interlocutor=current_user_role,
+                top_k=3,
+            )
+
         # Render system prompt
         system_prompt = self.renderer.render_persona(
             persona=self.persona,
             mode=self.mode,
             state=self.current_state,
+            memory_context=memory_context,
+            voice_exemplars=voice_exemplars,
         )
 
         # Build messages payload

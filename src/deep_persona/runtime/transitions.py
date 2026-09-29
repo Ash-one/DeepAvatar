@@ -72,25 +72,116 @@ def classify_event_rule_based(user_message: str, previous_events: Optional[List[
     return "user_neutral"
 
 
-def update_scalars(state: PersonaState, event: str) -> None:
-    """Update psychological scalars based on event type."""
-    if event == "user_accusatory":
+EVENT_SENSITIVITY_MAP = {
+    "user_accusatory": "criticism",
+    "accusatory": "criticism",
+    "criticism": "criticism",
+    "user_empathy": "empathy",
+    "empathy": "empathy",
+    "repeated_criticism": "repeated_criticism",
+    "praise": "praise",
+}
+
+
+def update_scalars(
+    state: PersonaState,
+    event: str,
+    persona: Optional[PersonaConfig] = None,
+) -> None:
+    """Update psychological scalars based on event type, taking persona-specific sensitivities & baseline into account."""
+    sensitivities = persona.dynamics.sensitivities if persona and persona.dynamics else {}
+    baseline = persona.dynamics.baseline if persona and persona.dynamics else None
+    recovery = persona.dynamics.recovery if persona and persona.dynamics else {}
+
+    mapped_event = EVENT_SENSITIVITY_MAP.get(event, event)
+    sensitivity = sensitivities.get(event) or sensitivities.get(mapped_event)
+
+    if sensitivity:
+        state.trust += sensitivity.trust_delta
+        state.defensiveness += sensitivity.defensiveness_delta
+        state.engagement += sensitivity.engagement_delta
+    elif event == "repeated_criticism":
+        # If repeated_criticism has no direct sensitivity, check criticism and scale by 1.5x
+        crit_sens = sensitivities.get("criticism")
+        if crit_sens:
+            state.trust += 1.5 * crit_sens.trust_delta
+            state.defensiveness += 1.5 * crit_sens.defensiveness_delta
+            state.engagement += 1.5 * crit_sens.engagement_delta
+        else:
+            state.defensiveness += 0.25
+            state.trust -= 0.15
+    elif event == "user_accusatory":
         state.defensiveness += 0.15
         state.trust -= 0.10
     elif event == "user_empathy":
         state.trust += 0.10
         state.defensiveness -= 0.05
-    elif event == "repeated_criticism":
-        state.defensiveness += 0.25
-        state.trust -= 0.15
     elif event == "user_neutral":
-        state.defensiveness = max(0.0, state.defensiveness - 0.02)
+        if baseline is not None:
+            # Revert scalars towards character's baseline
+            trust_decay = recovery.get("trust_decay", 0.01)
+            defensiveness_decay = recovery.get("defensiveness_decay", 0.02)
+            engagement_decay = recovery.get("engagement_decay", 0.01)
+
+            def _step_toward(curr: float, target: float, rate: float) -> float:
+                if abs(curr - target) <= rate:
+                    return target
+                return curr - rate if curr > target else curr + rate
+
+            state.trust = _step_toward(state.trust, baseline.trust, trust_decay)
+            state.defensiveness = _step_toward(state.defensiveness, baseline.defensiveness, defensiveness_decay)
+            state.engagement = _step_toward(state.engagement, baseline.engagement, engagement_decay)
+        else:
+            state.defensiveness = max(0.0, state.defensiveness - 0.02)
 
     state.clamp()
 
 
-def update_stage(state: PersonaState) -> None:
-    """Update macro psychological stage based on scalars."""
+def update_stage(
+    state: PersonaState,
+    event: Optional[str] = None,
+    persona: Optional[PersonaConfig] = None,
+    history_events: Optional[List[str]] = None,
+) -> None:
+    """Update macro psychological stage based on declarative rules or default scalar thresholds."""
+    # 1. First check explicit declarative transitions in persona config if available
+    transitions = persona.dynamics.transitions if persona and persona.dynamics else []
+    for rule in transitions:
+        if isinstance(rule, dict):
+            from_stage = rule.get("from") or rule.get("from_stage")
+            to_stage = rule.get("to") or rule.get("to_stage")
+            trigger = rule.get("trigger", "")
+        else:
+            from_stage = getattr(rule, "from_stage", "")
+            to_stage = getattr(rule, "to_stage", "")
+            trigger = getattr(rule, "trigger", "")
+
+        if from_stage == state.stage:
+            matched = False
+            if trigger == event:
+                matched = True
+            elif trigger == "repeated_empathy" and history_events:
+                empathy_count = sum(1 for e in history_events[-3:] if e == "user_empathy")
+                if empathy_count >= 2:
+                    matched = True
+            elif trigger == "repeated_criticism" and history_events:
+                crit_count = sum(1 for e in history_events[-3:] if e in ("user_accusatory", "repeated_criticism"))
+                if crit_count >= 2:
+                    matched = True
+            elif trigger in ("trust_high", "high_trust") and state.trust >= 0.70:
+                matched = True
+            elif trigger in ("trust_low", "low_trust") and state.trust <= 0.25:
+                matched = True
+            elif trigger in ("defensiveness_high", "high_defensiveness") and state.defensiveness >= 0.85:
+                matched = True
+            elif evaluate_condition_expr(trigger, state):
+                matched = True
+
+            if matched and to_stage:
+                state.stage = to_stage
+                return
+
+    # 2. Fallback to standard baseline transitions if no custom rule matched
     if state.stage == "guarded":
         if state.trust >= 0.6:
             state.stage = "cooperative"
@@ -163,27 +254,27 @@ def check_conditional_disclosures(persona: PersonaConfig, state: PersonaState) -
 
 
 class StateManager:
-    """External state manager implementing the StateDynamics specification."""
+    """External state manager implementing the StateDynamics specification with persona-specific dynamics."""
 
     def __init__(self, persona: PersonaConfig, initial_state: Optional[PersonaState] = None):
         self.persona = persona
-        self.state = initial_state or PersonaState(stage=persona.dynamics.initial_stage)
+        self.state = initial_state or PersonaState.create_for_persona(persona)
         self.history_events: List[str] = []
 
     def update(self, user_message: str, detected_event: Optional[str] = None) -> PersonaState:
         """
         Execute single-turn state update pipeline:
         1. Classify event (if not pre-detected)
-        2. Update scalars & clamp
-        3. Transition macro stage
+        2. Update scalars & clamp (with persona sensitivities & recovery)
+        3. Transition macro stage (with declarative rules)
         4. Check and gate conditional disclosures
         5. Increment turn
         """
         event = detected_event or classify_event_rule_based(user_message, self.history_events)
         self.history_events.append(event)
 
-        update_scalars(self.state, event)
-        update_stage(self.state)
+        update_scalars(self.state, event, persona=self.persona)
+        update_stage(self.state, event=event, persona=self.persona, history_events=self.history_events)
         check_conditional_disclosures(self.persona, self.state)
         self.state.turn += 1
 

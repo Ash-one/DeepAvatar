@@ -41,3 +41,18 @@ class PersonaState:
             turn=data.get("turn", 0),
             revealed_information=set(data.get("revealed_information", [])),
         )
+
+    @classmethod
+    def create_for_persona(cls, persona: Any) -> "PersonaState":
+        """Instantiate initial state using persona-specific baseline and dynamics."""
+        dyn = getattr(persona, "dynamics", None)
+        stage = getattr(dyn, "initial_stage", "guarded") if dyn else "guarded"
+        baseline = getattr(dyn, "baseline", None) if dyn else None
+        if baseline is not None:
+            return cls(
+                stage=stage,
+                trust=float(getattr(baseline, "trust", 0.2)),
+                defensiveness=float(getattr(baseline, "defensiveness", 0.8)),
+                engagement=float(getattr(baseline, "engagement", 0.4)),
+            )
+        return cls(stage=stage)
