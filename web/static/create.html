@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deep Persona Forge — 人格构建与中间产物工坊</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css?v=4">
+  <link rel="stylesheet" href="/static/create.css?v=4">
+</head>
+<body>
+  <div class="create-container">
+    <!-- Top Header Navigation -->
+    <header class="create-header">
+      <div class="create-header-left">
+        <a href="/" class="nav-back-link" id="nav-back-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+          <span id="txt-nav-back">返回对话工坊</span>
+        </a>
+        <div class="header-brand">
+          <div class="brand-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a8 8 0 0 0-8 8c0 3.3 2 6.2 5 7.4V20a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2v-2.6c3-1.2 5-4.1 5-7.4a8 8 0 0 0-8-8z"/>
+              <path d="M10 13a2 2 0 1 0 4 0"/>
+            </svg>
+          </div>
+          <div class="brand-text">
+            <h1>Deep Persona <span class="badge-tag" id="badge-studio-tag">Forge 工坊</span></h1>
+            <p class="brand-sub" id="txt-brand-sub">证据驱动的人格归纳、中间产物检验与三层认知编辑系统</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="create-header-actions">
+        <!-- Load existing persona dropdown -->
+        <div class="control-group">
+          <label for="select-load-persona" class="field-label" style="margin:0; font-size: 0.75rem;" id="lbl-load-persona">载入已有角色:</label>
+          <select id="select-load-persona" class="select-input" style="width: 150px; padding: 4px 8px;">
+            <option value="">-- 选择角色 --</option>
+          </select>
+        </div>
+
+        <!-- Example template dropdown -->
+        <div class="control-group">
+          <select id="select-template" class="select-input" style="width: 150px; padding: 4px 8px;">
+            <option value="">⚡ 填入示例模板</option>
+            <option value="alex">Alex (规培实习医生)</option>
+            <option value="xianglin_sao">祥林嫂 (鲁镇悲剧女工)</option>
+            <option value="evelyn">Evelyn (叛逆期高中女生)</option>
+          </select>
+        </div>
+
+        <!-- Language toggle -->
+        <div class="lang-switch">
+          <button class="lang-btn active" id="lang-btn-zh" data-lang="zh">中文</button>
+          <button class="lang-btn" id="lang-btn-en" data-lang="en">EN</button>
+        </div>
+
+        <!-- Export YAML -->
+        <button id="btn-export-yaml" class="btn btn-outline" title="下载 YAML 规格">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span id="txt-export-yaml">导出 YAML</span>
+        </button>
+
+        <!-- Save Only -->
+        <button id="btn-save-only" class="btn btn-secondary" title="保存到本地角色库">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+          <span id="txt-save-only">保存角色</span>
+        </button>
+
+        <!-- Save & Chat -->
+        <button id="btn-save-and-chat" class="btn btn-primary" title="保存并立即进入对话">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span id="txt-save-chat">保存并开始对话</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Studio Tabs Navigation -->
+    <nav class="studio-tabs-bar">
+      <button class="studio-tab-btn active" data-tab="tab-extract" id="tab-btn-extract">
+        <span>🪄</span>
+        <span id="txt-tab-extract">文本抽取与流水线中间产物</span>
+        <span class="studio-tab-badge" id="badge-ev-count">0 证据</span>
+      </button>
+      <button class="studio-tab-btn" data-tab="tab-form" id="tab-btn-form">
+        <span>🧬</span>
+        <span id="txt-tab-form">三层人格可视化编辑</span>
+        <span class="studio-tab-badge">3 Layers</span>
+      </button>
+      <button class="studio-tab-btn" data-tab="tab-yaml" id="tab-btn-yaml">
+        <span>📄</span>
+        <span id="txt-tab-yaml">YAML 规格代码与校验</span>
+      </button>
+    </nav>
+
+    <!-- Studio Main Workspace -->
+    <main class="studio-workspace">
+
+      <!-- ================= TAB 1: EXTRACTION & INTERMEDIATE ARTIFACTS ================= -->
+      <section class="studio-tab-content active" id="tab-extract">
+        <!-- Story Input & Pipeline Launcher -->
+        <div class="studio-card">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">📖</span>
+              <span id="txt-story-input-title">输入小说 / 剧本故事文本并提取</span>
+            </div>
+            <span class="badge-tag" id="badge-pipeline-mode">Gemini 2.5 证据驱动管线</span>
+          </div>
+
+          <div class="studio-card-desc" id="txt-story-input-desc">
+            上传故事文本（支持 <strong>.txt</strong> 文件）或直接粘贴剧情片段，指定目标角色姓名。系统将自动进行分幕切片、细粒度原子证据抽取、三层认知归纳编译与一致性审查。
+          </div>
+
+          <div class="grid-2">
+            <div class="field-group">
+              <label for="extract-char-name" class="field-label">
+                <span id="lbl-char-name">目标角色姓名 (Character Name)*</span>
+                <span class="field-tip" id="tip-char-name">故事中的主要人物</span>
+              </label>
+              <input type="text" id="extract-char-name" class="text-input" placeholder="例如：祥林嫂 / Alex / Hamlet">
+            </div>
+
+            <div class="field-group">
+              <label for="extract-char-aliases" class="field-label">
+                <span id="lbl-char-aliases">角色别名/代称 (Aliases，逗号分隔)</span>
+                <span class="field-tip" id="tip-char-aliases">如：祥林之妻, 卫老婆子口中的儿媳</span>
+              </label>
+              <input type="text" id="extract-char-aliases" class="text-input" placeholder="祥林嫂, 祥林之妻">
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <!-- File upload dropzone -->
+            <div class="field-group">
+              <label class="field-label" id="lbl-upload-file">上传故事 .txt 文件</label>
+              <div class="extract-upload-zone" id="file-dropzone">
+                <input type="file" id="file-input" accept=".txt" style="display: none;">
+                <div id="dropzone-content">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 6px;">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <p style="font-size: 0.8rem; color: var(--text-secondary);" id="txt-drop-tip">点击或将 .txt 文件拖拽至此处</p>
+                </div>
+                <div id="file-selected-badge" class="hidden" style="display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: rgba(99, 102, 241, 0.15); border-radius: var(--radius-sm);">
+                  <span id="file-selected-name" style="font-size: 0.8rem; font-weight: 600; color: #c7d2fe;">story.txt</span>
+                  <button type="button" id="btn-clear-file" style="background: none; border: none; color: #fda4af; font-size: 1.1rem; cursor: pointer;">&times;</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Paste text -->
+            <div class="field-group">
+              <label for="extract-text" class="field-label">
+                <span id="lbl-paste-text">或直接粘贴故事文本 / 剧情片段</span>
+                <span class="field-tip" id="lbl-char-count">0 字</span>
+              </label>
+              <textarea id="extract-text" class="textarea-input" rows="4" placeholder="在此粘贴故事正文、对话或独白片段..."></textarea>
+            </div>
+          </div>
+
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 6px;">
+            <div class="field-group" style="flex: 1; max-width: 260px;">
+              <label for="select-max-chars" class="field-label" id="lbl-max-chars">处理文本字数上限:</label>
+              <select id="select-max-chars" class="select-input" style="padding: 4px 8px;">
+                <option value="15000">15,000 字符 (快速)</option>
+                <option value="30000" selected>30,000 字符 (推荐)</option>
+                <option value="60000">60,000 字符 (深度长篇)</option>
+              </select>
+            </div>
+
+            <button type="button" class="btn btn-primary" id="btn-start-extract" style="padding: 10px 24px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3L12 3z"/></svg>
+              <span id="txt-start-extract">开始证据抽取与三层构建</span>
+            </button>
+          </div>
+
+          <!-- Pipeline Stepper Status -->
+          <div class="pipeline-stepper" id="pipeline-stepper">
+            <div class="step-item" id="step-1">
+              <span class="step-icon">1</span>
+              <span class="step-text" id="txt-step-1">分幕切片 (Scenes)</span>
+            </div>
+            <div class="step-item" id="step-2">
+              <span class="step-icon">2</span>
+              <span class="step-text" id="txt-step-2">原子证据抽取 (Evidence)</span>
+            </div>
+            <div class="step-item" id="step-3">
+              <span class="step-icon">3</span>
+              <span class="step-text" id="txt-step-3">三层归纳编译 (Induction)</span>
+            </div>
+            <div class="step-item" id="step-4">
+              <span class="step-icon">4</span>
+              <span class="step-text" id="txt-step-4">一致性审查 (Critic)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Intermediate Artifact 1: Segmented Scenes -->
+        <div class="studio-card" id="card-scenes-artifact">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">🎬</span>
+              <span id="txt-scenes-title">中间产物一：剧情分幕切片 (Segmented Scenes)</span>
+            </div>
+            <span class="artifact-counter" id="txt-scenes-count">0 幕</span>
+          </div>
+          <div class="studio-card-desc" id="txt-scenes-desc">
+            流水线将故事文本切片为独立的叙事场景，以捕获角色在不同情境和人际交互中的差异化行为。
+          </div>
+          <div class="scenes-grid" id="scenes-container">
+            <div style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;" id="txt-scenes-empty">
+              尚未提取场景，请先在上方输入文本并启动抽取。
+            </div>
+          </div>
+        </div>
+
+        <!-- Intermediate Artifact 2: Atomic Evidence Store with Full Editing Capabilities -->
+        <div class="studio-card" id="card-evidence-artifact">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">🔍</span>
+              <span id="txt-evidence-title">中间产物二：原子证据库 (Atomic Evidence Index)</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="artifact-counter" id="txt-evidence-count">0 项证据</span>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-add-evidence">
+                ＋ <span id="txt-add-evidence">手动添加证据</span>
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" id="btn-recompile-evidence" title="根据当前证据库重新推导人格和审查报告">
+                ⚡ <span id="txt-recompile-evidence">基于当前证据重新归纳</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="studio-card-desc" id="txt-evidence-desc">
+            每条证据均真实锚定于故事文本原文，记录对话台词、具身肢体动作或第一人称陈述，并赋予提取置信度。支持自由修改、删除或新增证据条目。
+          </div>
+
+          <!-- Evidence Filter -->
+          <div class="evidence-filter-bar">
+            <div class="filter-buttons">
+              <button type="button" class="filter-btn active" data-filter="all" id="btn-filter-all">全部 (All)</button>
+              <button type="button" class="filter-btn" data-filter="dialogue" id="btn-filter-dialogue">对话台词 (Dialogue)</button>
+              <button type="button" class="filter-btn" data-filter="behavior" id="btn-filter-behavior">肢体行为 (Behavior)</button>
+              <button type="button" class="filter-btn" data-filter="explicit_statement" id="btn-filter-statement">自述陈述 (Statement)</button>
+              <button type="button" class="filter-btn" data-filter="narration" id="btn-filter-narration">旁白叙述 (Narration)</button>
+            </div>
+          </div>
+
+          <!-- Evidence List -->
+          <div class="evidence-list" id="evidence-container">
+            <div style="color: var(--text-muted); font-size: 0.8rem; font-style: italic;" id="txt-evidence-empty">
+              证据库暂为空。启动提取后将展示细粒度原子证据。
+            </div>
+          </div>
+        </div>
+
+        <!-- Intermediate Artifact 3: Consistency & Grounding Critique Report -->
+        <div class="studio-card" id="card-critique-artifact">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">🛡️</span>
+              <span id="txt-critique-title">中间产物三：一致性审查与锚定质检报告 (Grounding & Critique Report)</span>
+            </div>
+            <span class="badge-tag" id="badge-critic-status">Consistency Critic</span>
+          </div>
+
+          <div class="studio-card-desc" id="txt-critique-desc">
+            由心理学一致性裁判模块对归纳推导的三层人格进行严密审查，验证假说是否有证据支撑、检测是否存在自相矛盾或无依据的过度概括。
+          </div>
+
+          <div class="critique-dashboard">
+            <!-- Left: Grounding Gauge -->
+            <div class="grounding-gauge-box">
+              <div class="gauge-circle" id="critique-gauge-circle">
+                <span class="gauge-val" id="val-grounding-ratio">100%</span>
+                <span class="gauge-label" id="lbl-grounding-ratio">锚定率</span>
+              </div>
+              <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 6px;">
+                <span id="txt-hypotheses-grounded">已锚定假说:</span> <strong id="val-grounded-count">0 / 0</strong>
+              </div>
+              <div style="font-size: 0.72rem; color: var(--text-muted);">
+                <span id="txt-calibrated-count">校准假说数:</span> <span id="val-calibrated-count">0</span>
+              </div>
+            </div>
+
+            <!-- Right: Findings & Suggestions -->
+            <div class="critique-findings">
+              <div class="finding-row">
+                <div class="finding-title" style="color: #fda4af;">
+                  <span>⚠️</span>
+                  <span id="txt-contradictions-title">矛盾与过度概括 (Contradictions & Overgeneralizations):</span>
+                </div>
+                <div id="critique-contradictions-list">
+                  <div class="finding-item" style="color: #6ee7b7;" id="txt-no-contradictions">✅ 未检测到与文本证据相抵触的矛盾论断。</div>
+                </div>
+              </div>
+
+              <div class="finding-row">
+                <div class="finding-title" style="color: #fde68a;">
+                  <span>💡</span>
+                  <span id="txt-suggestions-title">改进与校准建议 (Critic Suggestions):</span>
+                </div>
+                <div id="critique-suggestions-list">
+                  <div class="finding-item" id="txt-default-suggestion">提取完成后将在此列出一致性校准建议。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 6px;">
+          <button type="button" class="btn btn-secondary" id="btn-next-to-form">
+            <span id="txt-next-to-form">前往三层架构可视化编辑 ➔</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= TAB 2: 3-LAYER PERSONA VISUAL EDITOR ================= -->
+      <section class="studio-tab-content" id="tab-form">
+        <!-- 1. Identity & Scenario -->
+        <div class="studio-card">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">🪪</span>
+              <span id="txt-sec1-title">1. 基础身份与场景背景 (Identity & Scenario)</span>
+            </div>
+            <span class="field-tip" id="txt-sec1-tip">定义角色的社会角色与初始对抗情境</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label for="persona-id" class="field-label">
+                <span id="lbl-form-id">唯一 ID (英文小写/下划线)*</span>
+              </label>
+              <input type="text" id="persona-id" class="text-input" placeholder="e.g. alex_intern" pattern="^[a-z0-9_]+$">
+            </div>
+            <div class="field-group">
+              <label for="persona-name" class="field-label">
+                <span id="lbl-form-name">角色姓名 (Name)*</span>
+              </label>
+              <input type="text" id="persona-name" class="text-input" placeholder="e.g. Alex">
+            </div>
+            <div class="field-group">
+              <label for="persona-age" class="field-label">
+                <span id="lbl-form-age">年龄 (Age)*</span>
+              </label>
+              <input type="number" id="persona-age" class="text-input" placeholder="25" min="1" max="120">
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label for="persona-role" class="field-label">
+                <span id="lbl-form-role">角色职业/身份 (Role)*</span>
+              </label>
+              <input type="text" id="persona-role" class="text-input" placeholder="规培实习医生 (Medical Intern)">
+            </div>
+            <div class="field-group">
+              <label for="scenario-title" class="field-label">
+                <span id="lbl-form-scenario-title">场景标题 (Scenario Title)*</span>
+              </label>
+              <input type="text" id="scenario-title" class="text-input" placeholder="临床差错对质 (Error Confrontation)">
+            </div>
+            <div class="field-group">
+              <label for="user-role" class="field-label">
+                <span id="lbl-form-user-role">人类对话者身份 (User Role)*</span>
+              </label>
+              <input type="text" id="user-role" class="text-input" placeholder="主任医师 (Attending Physician)">
+            </div>
+          </div>
+
+          <div class="field-group">
+            <label for="scenario-context" class="field-label">
+              <span id="lbl-form-scenario-context">场景初始冲突描述 (Initial Context)*</span>
+              <span class="field-tip" id="tip-form-scenario-context">描述对话发生瞬间的直接冲突与环境压力</span>
+            </label>
+            <textarea id="scenario-context" class="textarea-input" rows="2" placeholder="夜班查房时，主任医师拿着一张写错剂量的医嘱单，当着其他同事的面快步走入值班室..."></textarea>
+          </div>
+        </div>
+
+        <!-- 2. External Layer & Voice Profile -->
+        <div class="studio-card">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">🎭</span>
+              <span id="txt-sec2-title">2. 外层行为表现与声纹特征 (External Layer & Voice Profile)</span>
+            </div>
+            <span class="field-tip" id="txt-sec2-tip">直接可观察的语言风格、情绪基调与情境行为模式</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label for="comm-style" class="field-label">
+                <span id="lbl-form-comm-style">沟通风格 (逗号分隔)</span>
+              </label>
+              <input type="text" id="comm-style" class="text-input" placeholder="语速迟疑, 紧张时堆砌医学术语">
+            </div>
+            <div class="field-group">
+              <label for="emotional-tone" class="field-label">
+                <span id="lbl-form-emotional-tone">情绪基调 (逗号分隔)</span>
+              </label>
+              <input type="text" id="emotional-tone" class="text-input" placeholder="焦虑, 恭敬, 试探性防御">
+            </div>
+            <div class="field-group">
+              <label for="observable-behavior" class="field-label">
+                <span id="lbl-form-observable-behavior">具身肢体行为 (逗号分隔)</span>
+              </label>
+              <input type="text" id="observable-behavior" class="text-input" placeholder="不自觉抠白大褂纽扣, 视线回避">
+            </div>
+          </div>
+
+          <!-- Behavior Patterns List -->
+          <div class="field-group" style="margin-top: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label class="field-label">
+                <span id="lbl-form-patterns">情境条件行为模式 (Behavior Patterns)</span>
+                <span class="field-tip" id="tip-form-patterns">条件反应倾向 P(behavior | trigger, appraisal)</span>
+              </label>
+              <button type="button" class="btn-add-item" id="btn-add-pattern">＋ <span id="txt-add-pattern">添加行为模式</span></button>
+            </div>
+            <div id="patterns-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;"></div>
+          </div>
+
+          <!-- Voice Profile -->
+          <div class="field-group" style="margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05);">
+            <label class="field-label">
+              <span id="lbl-form-voice">声纹特征与真实原话示范 (Voice Profile & Exemplars)</span>
+              <span class="field-tip" id="tip-form-voice">句子长度、句式习惯、直接度与原话锚定</span>
+            </label>
+            <div class="grid-3" style="margin-top: 6px;">
+              <div class="field-group">
+                <label for="voice-length" class="field-label" style="font-size: 0.72rem;" id="lbl-voice-length">句式长度风格</label>
+                <input type="text" id="voice-length" class="text-input" placeholder="short / hesitant / repetitive">
+              </div>
+              <div class="field-group">
+                <label for="voice-directness" class="field-label" style="font-size: 0.72rem;" id="lbl-voice-directness">直接度 (0.0 - 1.0)</label>
+                <input type="number" id="voice-directness" class="text-input" placeholder="0.7" step="0.05" min="0" max="1">
+              </div>
+              <div class="field-group">
+                <label for="voice-hedging" class="field-label" style="font-size: 0.72rem;" id="lbl-voice-hedging">模糊语/防卫语比例 (0.0 - 1.0)</label>
+                <input type="number" id="voice-hedging" class="text-input" placeholder="0.3" step="0.05" min="0" max="1">
+              </div>
+            </div>
+            <div class="field-group" style="margin-top: 8px;">
+              <label for="voice-exemplars" class="field-label" style="font-size: 0.72rem;" id="lbl-voice-exemplars">典型原话语录 (每行一条)</label>
+              <textarea id="voice-exemplars" class="textarea-input" rows="2" placeholder="我...我记得当时确认过病历的，难道是我看漏了？&#10;您说得对，这确实是我的疏忽..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Middle Layer: Beliefs & Gated Information -->
+        <div class="studio-card">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">🔐</span>
+              <span id="txt-sec3-title">3. 中层认知与信息门控 (Middle Layer: Beliefs & Secrets)</span>
+            </div>
+            <span class="field-tip" id="txt-sec3-tip">基于信任度的物理信息隔离与抵触模式</span>
+          </div>
+
+          <div class="field-group">
+            <label for="beliefs" class="field-label">
+              <span id="lbl-form-beliefs">角色固有信念 (Beliefs，分号或逗号分隔)</span>
+              <span class="field-tip" id="tip-form-beliefs">角色深信不疑的认知预设</span>
+            </label>
+            <input type="text" id="beliefs" class="text-input" placeholder="高层总是找规培生背锅; 承认全责可能断送规培生涯">
+          </div>
+
+          <!-- Conditional Secrets List -->
+          <div class="field-group" style="margin-top: 8px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label class="field-label">
+                <span id="lbl-form-secrets">条件门控秘密 (Conditional Gated Secrets)</span>
+                <span class="field-tip" id="tip-form-secrets">仅当满足条件（如信任度达到阈值）时才允许被披露的背景秘密</span>
+              </label>
+              <button type="button" class="btn-add-item" id="btn-add-secret">＋ <span id="txt-add-secret">添加门控秘密</span></button>
+            </div>
+            <div id="secrets-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;"></div>
+          </div>
+        </div>
+
+        <!-- 4. Internal Layer: Motivations & Latent Hypotheses -->
+        <div class="studio-card">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">🧠</span>
+              <span id="txt-sec4-title">4. 深层认知与内隐动机 (Internal Layer: Motivations & Hypotheses)</span>
+            </div>
+            <span class="field-tip" id="txt-sec4-tip">潜意识驱动力与硬性负向约束</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label for="motivations" class="field-label">
+                <span id="lbl-form-motivations">核心动机 (Motivations)*</span>
+              </label>
+              <input type="text" id="motivations" class="text-input" placeholder="职业生存, 渴望被认可, 害怕被边缘化">
+            </div>
+            <div class="field-group">
+              <label for="fears" class="field-label">
+                <span id="lbl-form-fears">核心恐惧 (Core Fears)*</span>
+              </label>
+              <input type="text" id="fears" class="text-input" placeholder="被取消规培资格, 同行公开羞辱, 梦想破灭">
+            </div>
+            <div class="field-group">
+              <label for="needs" class="field-label">
+                <span id="lbl-form-needs">心理需求 (Needs)</span>
+              </label>
+              <input type="text" id="needs" class="text-input" placeholder="导师包容, 心理安全感, 被理解">
+            </div>
+          </div>
+
+          <div style="padding: 10px 14px; border-radius: var(--radius-sm); background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.25); font-size: 0.78rem; color: #fecdd3;" id="txt-form-redline">
+            🛡️ <strong>硬性负向约束 (Hard Negative Constraint)</strong>: 智能体生成对话台词时，绝不允许直接说出上述内隐动机名词，必须通过外层防御机制间接流露。
+          </div>
+
+          <!-- Latent Hypotheses List -->
+          <div class="field-group" style="margin-top: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <label class="field-label">
+                <span id="lbl-form-hypotheses">深层特质假说 (Latent Trait Hypotheses)</span>
+                <span class="field-tip" id="tip-form-hypotheses">带有正反证据引用的心理学假说</span>
+              </label>
+              <button type="button" class="btn-add-item" id="btn-add-hypothesis">＋ <span id="txt-add-hypothesis">添加假说</span></button>
+            </div>
+            <div id="hypotheses-container" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;"></div>
+          </div>
+        </div>
+
+        <!-- 5. Dynamics Baseline (Optional) -->
+        <div class="studio-card">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">⚡</span>
+              <span id="txt-sec5-title">5. 个性化状态动力学基线 (Dynamics Baseline, 可选)</span>
+            </div>
+            <span class="field-tip" id="txt-sec5-tip">初始信任度、防御度与卷入度标量</span>
+          </div>
+
+          <div class="grid-3">
+            <div class="field-group">
+              <label for="dyn-trust" class="field-label">
+                <span id="lbl-dyn-trust">初始信任度 Trust (0.0 - 1.0)</span>
+              </label>
+              <input type="number" id="dyn-trust" class="text-input" placeholder="0.2" step="0.05" min="0" max="1" value="0.2">
+            </div>
+            <div class="field-group">
+              <label for="dyn-defensiveness" class="field-label">
+                <span id="lbl-dyn-def">初始防御度 Defensiveness (0.0 - 1.0)</span>
+              </label>
+              <input type="number" id="dyn-defensiveness" class="text-input" placeholder="0.8" step="0.05" min="0" max="1" value="0.8">
+            </div>
+            <div class="field-group">
+              <label for="dyn-engagement" class="field-label">
+                <span id="lbl-dyn-eng">初始卷入度 Engagement (0.0 - 1.0)</span>
+              </label>
+              <input type="number" id="dyn-engagement" class="text-input" placeholder="0.4" step="0.05" min="0" max="1" value="0.4">
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 12px; margin-top: 6px;">
+          <button type="button" class="btn btn-secondary" id="btn-sync-to-yaml">
+            <span id="txt-sync-to-yaml">同步到 YAML 规格代码 ➔</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: YAML CODE & LIVE SPEC ================= -->
+      <section class="studio-tab-content" id="tab-yaml">
+        <div class="studio-card">
+          <div class="studio-card-header">
+            <div class="studio-card-title">
+              <span class="studio-card-icon">📄</span>
+              <span id="txt-yaml-title">YAML 角色规格源码实时编辑与校验</span>
+            </div>
+            <div class="yaml-toolbar">
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-yaml-from-form">
+                ↺ <span id="txt-yaml-from-form">从表单更新 YAML</span>
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-yaml-to-form">
+                ⇄ <span id="txt-yaml-to-form">将 YAML 解析同步回表单</span>
+              </button>
+              <button type="button" class="btn btn-outline btn-sm" id="btn-validate-yaml">
+                ✓ <span id="txt-validate-yaml">校验格式合法性</span>
+              </button>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-copy-yaml">
+                📋 <span id="txt-copy-yaml">复制到剪贴板</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="studio-card-desc" id="txt-yaml-desc">
+            此处展示完整的 Deep Persona YAML 规范文件。可直接编辑代码，点击校验以确保符合 Pydantic 模型规范。
+          </div>
+
+          <div class="yaml-editor-wrapper">
+            <textarea id="yaml-code-editor" class="yaml-textarea" spellcheck="false" placeholder="# Deep Persona Specification YAML..."></textarea>
+            <div class="yaml-status-bar" id="yaml-status-bar">
+              <span id="yaml-status-text" style="color: var(--text-muted);">就绪</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Modal for Editing/Adding an Atomic Evidence Item -->
+  <div class="studio-modal-overlay hidden" id="modal-evidence">
+    <div class="studio-modal-box">
+      <div class="studio-modal-header">
+        <h3 id="modal-ev-title" style="font-size: 0.95rem; font-weight: 600;">编辑原子证据 (Edit Atomic Evidence)</h3>
+        <button type="button" id="btn-close-ev-modal" style="background:none; border:none; color:var(--text-muted); font-size:1.3rem; cursor:pointer;">&times;</button>
+      </div>
+      <div class="studio-modal-body">
+        <input type="hidden" id="edit-ev-index" value="-1">
+        <div class="grid-2">
+          <div class="field-group">
+            <label for="edit-ev-id" class="field-label">证据 ID</label>
+            <input type="text" id="edit-ev-id" class="text-input" placeholder="ev_001">
+          </div>
+          <div class="field-group">
+            <label for="edit-ev-type" class="field-label">证据类型 (Type)</label>
+            <select id="edit-ev-type" class="select-input">
+              <option value="dialogue">dialogue (对话台词)</option>
+              <option value="behavior">behavior (肢体行为)</option>
+              <option value="explicit_statement">explicit_statement (第一人称自述)</option>
+              <option value="narration">narration (旁白叙述)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="edit-ev-span" class="field-label">原文摘录 (Verbatim Quote / Span)*</label>
+          <textarea id="edit-ev-span" class="textarea-input" rows="3" placeholder="故事中可直接引用的原文片段..."></textarea>
+        </div>
+
+        <div class="grid-2">
+          <div class="field-group">
+            <label for="edit-ev-scene" class="field-label">来源场景 / 章节</label>
+            <input type="text" id="edit-ev-scene" class="text-input" placeholder="Scene 1: 鲁镇街头">
+          </div>
+          <div class="field-group">
+            <label for="edit-ev-conf" class="field-label">置信度 (0.0 - 1.0)</label>
+            <input type="number" id="edit-ev-conf" class="text-input" placeholder="0.9" step="0.05" min="0" max="1" value="0.9">
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="field-group">
+            <label for="edit-ev-situation" class="field-label">情境描述 (Situation)</label>
+            <input type="text" id="edit-ev-situation" class="text-input" placeholder="被问及阿毛之事">
+          </div>
+          <div class="field-group">
+            <label for="edit-ev-interlocutor" class="field-label">交互对象 (Interlocutor)</label>
+            <input type="text" id="edit-ev-interlocutor" class="text-input" placeholder="鲁镇茶客">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label for="edit-ev-observation" class="field-label">观察到的言行总结 (Observation)</label>
+          <input type="text" id="edit-ev-observation" class="text-input" placeholder="双手搓粗布围裙，发呆站立">
+        </div>
+      </div>
+      <div class="studio-modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" id="btn-cancel-ev-modal">取消</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-save-ev-modal">保存证据</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- JS Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+  <script src="/static/create.js?v=4"></script>
+</body>
+</html>

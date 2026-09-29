@@ -11,12 +11,13 @@ from starlette.concurrency import run_in_threadpool
 
 from deep_persona.evaluation.extended import ExtendedDiagnosticsEvaluator
 from deep_persona.llm.gemini import GeminiLLM, MockLLM
-from deep_persona.persona.extractor import StoryPersonaExtractor
+from deep_persona.persona.critic import ConsistencyCritic, CritiqueReport
+from deep_persona.persona.extractor import StoryPersonaExtractor, segment_narrative
 from deep_persona.persona.loader import load_persona
 from deep_persona.persona.renderer import PromptRenderer
-from deep_persona.persona.schema import PersonaConfig
+from deep_persona.persona.schema import Evidence, PersonaConfig
 from deep_persona.runtime.agent import PersonaAgent
-from deep_persona.runtime.logging import ConversationLogger, extract_embodied_action
+from deep_persona.runtime.logging import ConversationLogger, extract_embodied_action, extract_thought_and_action
 from deep_persona.runtime.state import PersonaState
 from deep_persona.runtime.transitions import classify_event_rule_based
 
@@ -62,6 +63,7 @@ class ActiveSession:
     logger: Optional[ConversationLogger] = None
     seed: int = 42
     turns: List[Dict[str, Any]] = []
+    tutor_mode: bool = False
 
 
 session = ActiveSession()
@@ -72,12 +74,18 @@ class InitChatRequest(BaseModel):
     mode: str = "deep_external_state"
     model: Optional[str] = "gemini-2.5-flash"
     seed: int = 42
+    tutor_mode: bool = False
 
 
 class SendMessageRequest(BaseModel):
     message: str
     persona_id: Optional[str] = None
     mode: Optional[str] = None
+    tutor_mode: Optional[bool] = None
+
+
+class ToggleTutorRequest(BaseModel):
+    enabled: Optional[bool] = None
 
 
 class CreatePersonaRequest(BaseModel):
@@ -102,7 +110,19 @@ class CreatePersonaRequest(BaseModel):
     voice_profile: Optional[Dict[str, Any]] = None
     evidence_index: List[Dict[str, Any]] = Field(default_factory=list)
     dynamics_config: Optional[Dict[str, Any]] = None
+    resistance_patterns: Optional[List[Dict[str, Any]]] = None
+    constraints: Optional[List[str]] = None
     overwrite: bool = False
+
+
+class CompileFromEvidenceRequest(BaseModel):
+    character_name: str
+    evidence_list: List[Dict[str, Any]]
+    run_llm_critic: bool = False
+
+
+class ValidateYamlRequest(BaseModel):
+    yaml_content: str
 
 
 @app.get("/api/personas")
@@ -216,7 +236,7 @@ def create_persona(req: CreatePersonaRequest):
                 for i, item in enumerate(req.conditional_secrets)
                 if isinstance(item, dict) and item.get("content", "").strip()
             ],
-            "resistance_patterns": [
+            "resistance_patterns": req.resistance_patterns or [
                 {"trigger": "user_accusatory", "behavior": "deflect"},
                 {"trigger": "repeated_criticism", "behavior": "withdraw"},
             ],
@@ -228,7 +248,7 @@ def create_persona(req: CreatePersonaRequest):
             "format": "[action]",
             "allowed": ["gaze", "posture", "gestures", "facial_expression"],
         },
-        "constraints": [
+        "constraints": req.constraints or [
             "remain strictly in role",
             "do not break character",
             "do not hallucinate ungrounded facts",
@@ -304,18 +324,151 @@ async def extract_persona_from_story(
 
     try:
         extractor = StoryPersonaExtractor()
+        chunks = segment_narrative(raw_text)
+        if not chunks:
+            chunks = [{"chapter": 1, "scene": "Scene 1", "text": raw_text}]
+
         extracted = await run_in_threadpool(
             extractor.extract_from_story,
             raw_text,
             target_character,
         )
+
+        evidence_dicts = extracted.get("evidence_index", [])
+        evidence_list = []
+        for ev in evidence_dicts:
+            try:
+                evidence_list.append(Evidence.model_validate(ev))
+            except Exception:
+                pass
+
+        if evidence_list:
+            critic = ConsistencyCritic(llm=extractor.llm)
+            _, critique_report = critic.audit(
+                compiled_persona=extracted,
+                evidence_list=evidence_list,
+                run_llm_critic=False,
+            )
+            report_dict = critique_report.model_dump()
+        else:
+            report_dict = {
+                "is_valid": True,
+                "grounded_ratio": 1.0,
+                "total_hypotheses": len(extracted.get("internal_layer", {}).get("latent_hypotheses", [])),
+                "grounded_hypotheses": len(extracted.get("internal_layer", {}).get("latent_hypotheses", [])),
+                "invalid_evidence_ids": [],
+                "contradictions": [],
+                "unsupported_claims": [],
+                "calibrated_hypotheses_count": 0,
+                "suggestions": ["No explicit contradictions detected."],
+            }
+
+        scenes = [
+            {
+                "chapter": ch.get("chapter", idx + 1),
+                "scene": ch.get("scene", f"Scene {idx + 1}"),
+                "text_preview": ch.get("text", "")[:200] + ("..." if len(ch.get("text", "")) > 200 else ""),
+                "char_count": len(ch.get("text", "")),
+            }
+            for idx, ch in enumerate(chunks)
+        ]
+
         return {
             "status": "success",
             "character_name": target_character,
             "extracted": extracted,
+            "intermediate": {
+                "scenes": scenes,
+                "evidence_list": [ev.model_dump() for ev in evidence_list] if evidence_list else evidence_dicts,
+                "critique_report": report_dict,
+            },
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Persona extraction failed: {str(e)}")
+
+
+@app.post("/api/personas/compile-from-evidence")
+def compile_from_evidence(req: CompileFromEvidenceRequest):
+    """Re-compile and critique 3-Layer Persona from edited atomic evidence list."""
+    character_name = req.character_name.strip()
+    if not character_name:
+        raise HTTPException(status_code=400, detail="Character name cannot be empty.")
+    if not req.evidence_list:
+        raise HTTPException(status_code=400, detail="Evidence list cannot be empty.")
+
+    ev_models = []
+    for item in req.evidence_list:
+        try:
+            ev_models.append(Evidence.model_validate(item))
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Invalid evidence format: {e}")
+
+    try:
+        extractor = StoryPersonaExtractor()
+        compiled = extractor.compiler.compile(
+            character_name=character_name,
+            evidence_list=ev_models,
+        )
+        refined, critique_report = extractor.critic.audit(
+            compiled_persona=compiled,
+            evidence_list=ev_models,
+            run_llm_critic=req.run_llm_critic,
+        )
+        final_dict = extractor._format_as_flat_and_nested_dict(
+            refined,
+            ev_models,
+            character_name,
+        )
+        return {
+            "status": "success",
+            "character_name": character_name,
+            "extracted": final_dict,
+            "critique_report": critique_report.model_dump(),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compile persona from evidence: {str(e)}")
+
+
+@app.get("/api/personas/{persona_id}")
+def get_persona_detail(persona_id: str):
+    """Retrieve full configuration and raw YAML content for a specific persona."""
+    yaml_path = find_persona_yaml(persona_id)
+    if not yaml_path or not yaml_path.exists():
+        raise HTTPException(status_code=404, detail=f"Persona '{persona_id}' not found.")
+    try:
+        cfg, _ = load_persona(yaml_path)
+        with open(yaml_path, "r", encoding="utf-8") as f:
+            raw_yaml = f.read()
+        return {
+            "status": "success",
+            "id": cfg.persona.id,
+            "name": cfg.persona.name,
+            "config": cfg.model_dump(),
+            "raw_yaml": raw_yaml,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to load persona: {str(e)}")
+
+
+@app.post("/api/personas/validate-yaml")
+def validate_yaml(req: ValidateYamlRequest):
+    """Validate raw YAML content against PersonaConfig schema."""
+    try:
+        parsed = yaml.safe_load(req.yaml_content)
+        if not isinstance(parsed, dict):
+            raise ValueError("YAML content must evaluate to a dictionary.")
+        validated = PersonaConfig.model_validate(parsed)
+        return {
+            "valid": True,
+            "id": validated.persona.id,
+            "name": validated.persona.name,
+            "config": validated.model_dump(),
+        }
+    except Exception as e:
+        return {
+            "valid": False,
+            "error": str(e),
+        }
 
 
 @app.post("/api/chat/init")
@@ -338,6 +491,7 @@ def init_chat(req: InitChatRequest):
         mode=req.mode,
         llm=llm,
         renderer=renderer,
+        tutor_mode=req.tutor_mode,
     )
 
     logger = ConversationLogger(
@@ -359,6 +513,7 @@ def init_chat(req: InitChatRequest):
     session.logger = logger
     session.seed = req.seed
     session.turns = []
+    session.tutor_mode = req.tutor_mode
 
     evaluator = ExtendedDiagnosticsEvaluator(persona)
     diag = evaluator.evaluate_conversation({"turns": []})
@@ -370,6 +525,7 @@ def init_chat(req: InitChatRequest):
         "model": session.model,
         "scenario": persona.scenario.model_dump(),
         "state": agent.current_state.to_dict(),
+        "tutor_mode": session.tutor_mode,
         "metrics": {
             "pdr": diag.get("PDR", 0.0),
             "imer": diag.get("IMER", 0.0),
@@ -390,7 +546,16 @@ def send_message(req: SendMessageRequest):
         or (req.persona_id and session.persona_id != req.persona_id)
         or (req.mode and session.mode != req.mode)
     ):
-        init_chat(InitChatRequest(persona_id=target_persona_id, mode=target_mode))
+        init_chat(InitChatRequest(
+            persona_id=target_persona_id,
+            mode=target_mode,
+            tutor_mode=req.tutor_mode if req.tutor_mode is not None else session.tutor_mode,
+        ))
+
+    if req.tutor_mode is not None:
+        session.tutor_mode = req.tutor_mode
+        if session.agent:
+            session.agent.tutor_mode = req.tutor_mode
 
     user_text = req.message.strip()
     if not user_text:
@@ -403,7 +568,10 @@ def send_message(req: SendMessageRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    verbal_text, embodied_action = extract_embodied_action(reply_raw)
+    verbal_text, embodied_action, thought_content = extract_thought_and_action(
+        reply_raw,
+        reasoning_content=getattr(session.agent, "last_thought", None)
+    )
 
     session.logger.record_turn(
         turn_index=turn_index,
@@ -422,6 +590,8 @@ def send_message(req: SendMessageRequest):
         "user": user_text,
         "assistant": verbal_text,
         "assistant_raw": reply_raw,
+        "thought": thought_content,
+        "tutor_mode": session.tutor_mode,
         "assistant_embodied_action": embodied_action,
         "detected_event": event,
         "state_before": state_before.to_dict(),
@@ -446,8 +616,27 @@ def send_message(req: SendMessageRequest):
     return {
         "turn": turn_payload,
         "current_state": state_after.to_dict(),
+        "tutor_mode": session.tutor_mode,
         "trajectory_file": saved_file.name,
         "metrics": metrics,
+    }
+
+
+@app.post("/api/chat/toggle-tutor")
+def toggle_tutor(req: ToggleTutorRequest):
+    """Toggle or explicitly set Tutor persona implant mode for active conversation."""
+    if req.enabled is not None:
+        session.tutor_mode = req.enabled
+    else:
+        session.tutor_mode = not session.tutor_mode
+
+    if session.agent:
+        session.agent.tutor_mode = session.tutor_mode
+
+    return {
+        "status": "success",
+        "tutor_mode": session.tutor_mode,
+        "current_state": session.agent.current_state.to_dict() if session.agent else None,
     }
 
 
@@ -466,7 +655,13 @@ def get_history():
 @app.post("/api/chat/reset")
 def reset_chat():
     """Reset current conversation."""
-    return init_chat(InitChatRequest(persona_id=session.persona_id, mode=session.mode, model=session.model, seed=session.seed))
+    return init_chat(InitChatRequest(
+        persona_id=session.persona_id,
+        mode=session.mode,
+        model=session.model,
+        seed=session.seed,
+        tutor_mode=session.tutor_mode,
+    ))
 
 
 # Serve static web frontend
@@ -475,4 +670,12 @@ if STATIC_DIR.exists():
 
     @app.get("/")
     def serve_index():
+        return FileResponse(STATIC_DIR / "index.html")
+
+    @app.get("/create")
+    @app.get("/create.html")
+    def serve_create():
+        create_file = STATIC_DIR / "create.html"
+        if create_file.exists():
+            return FileResponse(create_file)
         return FileResponse(STATIC_DIR / "index.html")
