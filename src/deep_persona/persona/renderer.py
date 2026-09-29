@@ -37,6 +37,7 @@ class PromptRenderer:
         state: Optional[PersonaState] = None,
         memory_context: Optional[Dict[str, Any]] = None,
         voice_exemplars: Optional[List[Any]] = None,
+        tutor_mode: bool = False,
     ) -> str:
         """
         Render system prompt for persona based on mode.
@@ -55,6 +56,7 @@ class PromptRenderer:
                 middle_layer=persona.middle_layer,
                 internal_layer=persona.internal_layer,
                 constraints=persona.constraints,
+                tutor_mode=tutor_mode,
             )
 
         # For deep modes
@@ -81,6 +83,7 @@ class PromptRenderer:
             active_conditional_info=active_info,
             memory_context=memory_context,
             voice_exemplars=voice_exemplars,
+            tutor_mode=tutor_mode,
         )
 
     def render_user_simulator(

@@ -25,6 +25,7 @@ class PersonaAgent:
         temperature: float = 0.7,
         top_p: float = 0.95,
         max_tokens: int = 1024,
+        tutor_mode: bool = False,
     ):
         self.persona = persona
         self.mode = mode
@@ -41,6 +42,29 @@ class PersonaAgent:
         # For prompt state or deep/flat, keep a baseline state tracker
         self.current_state = initial_state or PersonaState.create_for_persona(persona)
         self.history: List[Dict[str, str]] = []
+        self.last_thought: Optional[str] = None
+        self._tutor_mode: bool = False
+        self.tutor_mode = tutor_mode
+
+    @property
+    def tutor_mode(self) -> bool:
+        return self._tutor_mode
+
+    @tutor_mode.setter
+    def tutor_mode(self, value: bool) -> None:
+        self._tutor_mode = bool(value)
+        if self._tutor_mode:
+            self.current_state.trust = 1.0
+            self.current_state.defensiveness = min(self.current_state.defensiveness, 0.15)
+            self.current_state.engagement = max(self.current_state.engagement, 0.80)
+            if self.current_state.stage in ("guarded", "defensive"):
+                self.current_state.stage = "cooperative"
+            if hasattr(self, "state_manager") and self.state_manager and hasattr(self.state_manager, "state"):
+                self.state_manager.state.trust = 1.0
+                self.state_manager.state.defensiveness = min(self.state_manager.state.defensiveness, 0.15)
+                self.state_manager.state.engagement = max(self.state_manager.state.engagement, 0.80)
+                if self.state_manager.state.stage in ("guarded", "defensive"):
+                    self.state_manager.state.stage = "cooperative"
 
     def respond(self, user_message: str) -> Tuple[str, PersonaState, PersonaState, str]:
         """
@@ -48,6 +72,19 @@ class PersonaAgent:
         Returns:
             Tuple of (agent_reply, state_before_snapshot, state_after_snapshot, detected_event)
         """
+        if self.tutor_mode:
+            self.current_state.trust = 1.0
+            self.current_state.defensiveness = min(self.current_state.defensiveness, 0.15)
+            self.current_state.engagement = max(self.current_state.engagement, 0.80)
+            if self.current_state.stage in ("guarded", "defensive"):
+                self.current_state.stage = "cooperative"
+            if self.mode == "deep_external_state":
+                self.state_manager.state.trust = 1.0
+                self.state_manager.state.defensiveness = min(self.state_manager.state.defensiveness, 0.15)
+                self.state_manager.state.engagement = max(self.state_manager.state.engagement, 0.80)
+                if self.state_manager.state.stage in ("guarded", "defensive"):
+                    self.state_manager.state.stage = "cooperative"
+
         # Snapshot state before turn
         state_before = PersonaState.from_dict(self.current_state.to_dict())
 
@@ -65,6 +102,17 @@ class PersonaAgent:
             self.current_state.turn += 1
         elif self.mode in ("deep", "flat"):
             self.current_state.turn += 1
+
+        if self.tutor_mode:
+            self.current_state.trust = 1.0
+            self.current_state.defensiveness = min(self.current_state.defensiveness, 0.20)
+            if self.current_state.stage in ("guarded", "defensive"):
+                self.current_state.stage = "cooperative"
+            if self.mode == "deep_external_state":
+                self.state_manager.state.trust = 1.0
+                self.state_manager.state.defensiveness = min(self.state_manager.state.defensiveness, 0.20)
+                if self.state_manager.state.stage in ("guarded", "defensive"):
+                    self.state_manager.state.stage = "cooperative"
 
         state_after = PersonaState.from_dict(self.current_state.to_dict())
 
@@ -91,6 +139,7 @@ class PersonaAgent:
             state=self.current_state,
             memory_context=memory_context,
             voice_exemplars=voice_exemplars,
+            tutor_mode=self.tutor_mode,
         )
 
         # Build messages payload
@@ -109,6 +158,7 @@ class PersonaAgent:
         )
 
         reply_content = response.content
+        self.last_thought = getattr(response, "reasoning_content", None)
         # Update history
         self.history.append({"role": "user", "content": user_message})
         self.history.append({"role": "assistant", "content": reply_content})
