@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from starlette.concurrency import run_in_threadpool
 
 from deep_persona.evaluation.extended import ExtendedDiagnosticsEvaluator
 from deep_persona.llm.gemini import GeminiLLM, MockLLM
@@ -23,6 +24,23 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 PERSONAS_DIR = ROOT_DIR / "personas"
 STATIC_DIR = ROOT_DIR / "web" / "static"
 RESULTS_DIR = ROOT_DIR / "results" / "conversations"
+
+
+def find_persona_yaml(persona_id: str) -> Optional[Path]:
+    """Find persona YAML path by direct filename, stem, or internal persona.id."""
+    direct = PERSONAS_DIR / f"{persona_id}.yaml"
+    if direct.exists():
+        return direct
+    for yf in PERSONAS_DIR.glob("*.yaml"):
+        if yf.stem == persona_id:
+            return yf
+        try:
+            cfg, _ = load_persona(yf)
+            if cfg.persona.id == persona_id:
+                return yf
+        except Exception:
+            continue
+    return None
 
 app = FastAPI(title="Deep Persona Interactive Studio", version="0.1.0")
 
@@ -58,6 +76,8 @@ class InitChatRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     message: str
+    persona_id: Optional[str] = None
+    mode: Optional[str] = None
 
 
 class CreatePersonaRequest(BaseModel):
@@ -77,6 +97,11 @@ class CreatePersonaRequest(BaseModel):
     motivations: List[str] = Field(default_factory=list)
     fears: List[str] = Field(default_factory=list)
     psychological_needs: List[str] = Field(default_factory=list)
+    latent_hypotheses: List[Dict[str, Any]] = Field(default_factory=list)
+    behavior_patterns: List[Dict[str, Any]] = Field(default_factory=list)
+    voice_profile: Optional[Dict[str, Any]] = None
+    evidence_index: List[Dict[str, Any]] = Field(default_factory=list)
+    dynamics_config: Optional[Dict[str, Any]] = None
     overwrite: bool = False
 
 
@@ -92,11 +117,12 @@ def get_personas():
                 "name": cfg.persona.name,
                 "age": cfg.persona.age,
                 "role": cfg.persona.role,
-                "scenario": cfg.scenario.model_dump(),
+                "scenario": cfg.scenario.model_dump() if cfg.scenario else None,
                 "external_layer": cfg.external_layer.model_dump(),
                 "middle_layer": cfg.middle_layer.model_dump(),
                 "internal_layer": cfg.internal_layer.model_dump(),
                 "dynamics": cfg.dynamics.model_dump(),
+                "evidence_count": len(cfg.evidence_index),
             })
         except Exception as e:
             continue
@@ -130,6 +156,41 @@ def create_persona(req: CreatePersonaRequest):
         )
 
     # 2. Build structured dictionary
+    dynamics_dict = req.dynamics_config or {
+        "initial_stage": "guarded",
+        "stages": {
+            "guarded": {"description": "limited disclosure, defensive stance"},
+            "defensive": {"description": "sarcasm, resistance, withdrawal"},
+            "cooperative": {"description": "limited but meaningful disclosure"},
+            "reflective": {"description": "acknowledges mixed motivations"},
+        },
+        "transitions": [
+            {"from": "guarded", "to": "defensive", "trigger": "user_accusatory"},
+            {"from": "guarded", "to": "cooperative", "trigger": "repeated_empathy"},
+            {"from": "cooperative", "to": "reflective", "trigger": "trust_high"},
+        ],
+    }
+
+    external_layer_dict = {
+        "communication_style": [s.strip() for s in req.communication_style if s.strip()],
+        "emotional_tone": [s.strip() for s in req.emotional_tone if s.strip()],
+        "observable_behavior": [s.strip() for s in req.observable_behavior if s.strip()],
+        "behavior_patterns": req.behavior_patterns,
+    }
+    if req.voice_profile:
+        external_layer_dict["voice_profile"] = req.voice_profile
+
+    internal_layer_dict = {
+        "motivations": [s.strip() for s in req.motivations if s.strip()],
+        "fears": [s.strip() for s in req.fears if s.strip()],
+        "psychological_needs": [s.strip() for s in req.psychological_needs if s.strip()],
+        "non_disclosure_rules": [
+            "never explicitly explain these motivations",
+            "internal motivations must influence behavior indirectly",
+        ],
+        "latent_hypotheses": req.latent_hypotheses,
+    }
+
     persona_dict = {
         "persona": {
             "id": cleaned_id,
@@ -143,11 +204,7 @@ def create_persona(req: CreatePersonaRequest):
             "user_role": req.scenario_user_role.strip(),
             "persona_role": req.scenario_persona_role.strip(),
         },
-        "external_layer": {
-            "communication_style": [s.strip() for s in req.communication_style if s.strip()],
-            "emotional_tone": [s.strip() for s in req.emotional_tone if s.strip()],
-            "observable_behavior": [s.strip() for s in req.observable_behavior if s.strip()],
-        },
+        "external_layer": external_layer_dict,
         "middle_layer": {
             "beliefs": [s.strip() for s in req.beliefs if s.strip()],
             "conditional_information": [
@@ -164,29 +221,8 @@ def create_persona(req: CreatePersonaRequest):
                 {"trigger": "repeated_criticism", "behavior": "withdraw"},
             ],
         },
-        "internal_layer": {
-            "motivations": [s.strip() for s in req.motivations if s.strip()],
-            "fears": [s.strip() for s in req.fears if s.strip()],
-            "psychological_needs": [s.strip() for s in req.psychological_needs if s.strip()],
-            "non_disclosure_rules": [
-                "never explicitly explain these motivations",
-                "internal motivations must influence behavior indirectly",
-            ],
-        },
-        "dynamics": {
-            "initial_stage": "guarded",
-            "stages": {
-                "guarded": {"description": "limited disclosure, defensive stance"},
-                "defensive": {"description": "sarcasm, resistance, withdrawal"},
-                "cooperative": {"description": "limited but meaningful disclosure"},
-                "reflective": {"description": "acknowledges mixed motivations"},
-            },
-            "transitions": [
-                {"from": "guarded", "to": "defensive", "trigger": "user_accusatory"},
-                {"from": "guarded", "to": "cooperative", "trigger": "repeated_empathy"},
-                {"from": "cooperative", "to": "reflective", "trigger": "trust_high"},
-            ],
-        },
+        "internal_layer": internal_layer_dict,
+        "dynamics": dynamics_dict,
         "embodied_expression": {
             "enabled": True,
             "format": "[action]",
@@ -197,6 +233,7 @@ def create_persona(req: CreatePersonaRequest):
             "do not break character",
             "do not hallucinate ungrounded facts",
         ],
+        "evidence_index": req.evidence_index,
     }
 
     # 3. Validate against Pydantic schema
@@ -267,9 +304,10 @@ async def extract_persona_from_story(
 
     try:
         extractor = StoryPersonaExtractor()
-        extracted = extractor.extract_from_story(
-            story_text=raw_text,
-            character_name=target_character,
+        extracted = await run_in_threadpool(
+            extractor.extract_from_story,
+            raw_text,
+            target_character,
         )
         return {
             "status": "success",
@@ -283,8 +321,8 @@ async def extract_persona_from_story(
 @app.post("/api/chat/init")
 def init_chat(req: InitChatRequest):
     """Initialize or reset chat session."""
-    yaml_path = PERSONAS_DIR / f"{req.persona_id}.yaml"
-    if not yaml_path.exists():
+    yaml_path = find_persona_yaml(req.persona_id)
+    if not yaml_path or not yaml_path.exists():
         raise HTTPException(status_code=404, detail=f"Persona {req.persona_id} not found")
 
     persona, persona_hash = load_persona(yaml_path)
@@ -343,8 +381,16 @@ def init_chat(req: InitChatRequest):
 @app.post("/api/chat/send")
 def send_message(req: SendMessageRequest):
     """Send user message and receive persona response with updated psychological state."""
-    if not session.agent or not session.logger:
-        init_chat(InitChatRequest())
+    target_persona_id = req.persona_id or session.persona_id or "evelyn"
+    target_mode = req.mode or session.mode or "deep_external_state"
+
+    if (
+        not session.agent
+        or not session.logger
+        or (req.persona_id and session.persona_id != req.persona_id)
+        or (req.mode and session.mode != req.mode)
+    ):
+        init_chat(InitChatRequest(persona_id=target_persona_id, mode=target_mode))
 
     user_text = req.message.strip()
     if not user_text:
